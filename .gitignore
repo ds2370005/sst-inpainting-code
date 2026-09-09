@@ -1,0 +1,27 @@
+# Python environments and caches
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+# Local credentials and settings
+.env
+.env.*
+!.env.example
+.DS_Store
+# Datasets and generated outputs
+data/
+himawari_sst_data/
+himawari_sst_data_crop1650/
+himawari_sst_patches256/
+cloud_only_mask_pool/
+*.nc
+*.md5
+*.npy
+*.npz
+checkpoints/
+outputs/
+logs/
+*.pt
+*.pth
+/crop_overview.png

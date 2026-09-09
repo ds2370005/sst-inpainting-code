@@ -1,0 +1,13 @@
+torch
+torchvision
+numpy
+scipy
+pandas
+xarray
+netCDF4
+rasterio
+pyyaml
+tqdm
+matplotlib
+pytest
+
