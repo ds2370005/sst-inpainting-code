@@ -9,6 +9,8 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
+from src.datasets.frame_index import build_frame_index, load_temporal_sample
+
 
 def normalize_sst(array: np.ndarray, min_temp: float, max_temp: float) -> np.ndarray:
     if not max_temp > min_temp:
@@ -40,7 +42,21 @@ class HimawariPatchDataset(Dataset[dict[str, torch.Tensor]]):
         patch_size: int,
         min_temp: float,
         max_temp: float,
+        time_interval_hours: int = 6,
+        max_cloud_fraction: float = 0.5,
+        satellite: str = "himawari",
     ) -> None:
+        if stage not in ("average", "anomaly"):
+            raise ValueError(f"Unknown stage: {stage}")
+        if time_steps <= 0 or patch_size <= 0 or time_interval_hours <= 0:
+            raise ValueError("Time steps, interval and patch size must be positive")
+        if not 0 <= max_cloud_fraction <= 1 or not max_temp > min_temp:
+            raise ValueError("Invalid cloud fraction or temperature range")
+        if satellite != "himawari":
+            raise ValueError("Only Himawari is currently supported; cross-satellite alignment is not implemented")
+        self.satellite = satellite
+        self.samples = None
+        self.selection_counts = {}
         self.data_root = Path(data_root)
         self.stage = stage
         self.time_steps = time_steps
@@ -49,6 +65,16 @@ class HimawariPatchDataset(Dataset[dict[str, torch.Tensor]]):
         self.max_temp = max_temp
         if not self.data_root.is_dir():
             raise FileNotFoundError(f"Himawari patch directory not found: {self.data_root}")
+
+        if (self.data_root / "frames").is_dir():
+            self.samples, self.selection_counts = build_frame_index(
+                self.data_root, satellite, time_steps, time_interval_hours,
+                patch_size, max_cloud_fraction,
+            )
+            self.paths = [sample.target for sample in self.samples]
+            if not self.samples:
+                raise ValueError(f"No eligible temporal samples in {self.data_root}: {self.selection_counts}")
+            return
 
         candidates = sorted(self.data_root.glob("*.npz"))
         self.paths: list[Path] = []
@@ -79,11 +105,17 @@ class HimawariPatchDataset(Dataset[dict[str, torch.Tensor]]):
 
     def __getitem__(self, index: int) -> dict[str, torch.Tensor]:
         path = self.paths[index]
-        with np.load(path, allow_pickle=False) as archive:
-            sst = np.asarray(archive["sst_volume"], dtype=np.float32)
-            cloud = np.asarray(archive["cloud_mask_volume"], dtype=np.uint8)
-            weekly = np.asarray(archive["weekly_average"], dtype=np.float32)
-            monthly = np.asarray(archive["monthly_average"], dtype=np.float32)
+        if self.samples is not None:
+            sst, cloud, weekly, monthly, target_sst, target_cloud = load_temporal_sample(
+                self.samples[index], self.satellite, self.patch_size,
+            )
+        else:
+            with np.load(path, allow_pickle=False) as archive:
+                sst = np.asarray(archive["sst_volume"], dtype=np.float32)
+                cloud = np.asarray(archive["cloud_mask_volume"], dtype=np.uint8)
+                weekly = np.asarray(archive["weekly_average"], dtype=np.float32)
+                monthly = np.asarray(archive["monthly_average"], dtype=np.float32)
+            target_sst, target_cloud = sst[:, -1], cloud[:, -1]
 
         expected_volume = (1, self.time_steps, self.patch_size, self.patch_size)
         if sst.shape != expected_volume or cloud.shape != expected_volume:
@@ -115,10 +147,10 @@ class HimawariPatchDataset(Dataset[dict[str, torch.Tensor]]):
                 "weekly_mask": torch.from_numpy(weekly_valid.astype(np.float32)),
             }
 
-        target_valid = volume_valid[:, -1]
+        target_valid = np.isfinite(target_sst) & (target_cloud == 0)
         return {
             **common,
-            "target_sst": self._normalized_field(sst[:, -1], target_valid),
+            "target_sst": self._normalized_field(target_sst, target_valid),
             "target_mask": torch.from_numpy(target_valid.astype(np.float32)),
         }
 
@@ -139,6 +171,9 @@ def create_himawari_loader(
         patch_size=int(data["patch_size"]),
         min_temp=float(data["min_temp"]),
         max_temp=float(data["max_temp"]),
+        time_interval_hours=int(data.get("time_interval_hours", 6)),
+        max_cloud_fraction=float(data.get("max_cloud_fraction", 0.5)),
+        satellite=str(data.get("satellite", "himawari")),
     )
     return torch.utils.data.DataLoader(
         dataset,

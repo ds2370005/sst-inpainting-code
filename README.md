@@ -49,9 +49,36 @@ observational SST frames. Coordinates are checked across observation times.
 Existing compatible frame files are skipped; `--overwrite` regenerates them.
 Use a new output directory if input data or processing settings change.
 
-**The current training loader and volume visualization scripts still expect
-legacy nine-frame NPZ files. The new frame format is a preprocessing-only
-migration; temporal assembly in the loader is not yet implemented.**
+## Train from single-observation products
+
+The training dataset auto-detects the `frames/` directory. Pass the parent
+`data/frames256`, not its `frames/himawari` child:
+
+```bash
+python -m src.train.train_average --config config.yaml --data-root data/frames256
+python -m src.train.train_anomaly --config config.yaml --data-root data/frames256
+```
+
+For each target, the loader selects the same grid cell at exact offsets
+`[-48,-42,-36,-30,-24,-18,-12,-6,0]` hours by default. It reads those nine
+observations in oldest-to-newest order and the target's separate average file.
+`data.time_steps` and `data.time_interval_hours` control these offsets.
+Outputs preserve the previous model interface `[1,T,H,W]` per sample.
+Anomaly targets are explicitly associated with the target observation.
+
+Targets lacking a required frame or average file are excluded. Targets above
+`data.max_cloud_fraction` (default 0.5, fraction of **all** patch pixels), or
+with no valid observed SST, are excluded. Cloudy historical frames are retained.
+Selection counts are printed at training startup. Metadata, array shapes and
+coordinate alignment are checked while reading; malformed/misaligned products
+raise errors rather than being silently combined. SST/averages are normalized
+using configured temperature bounds, invalid inputs are filled with zero, and
+validity masks exclude cloud and non-finite SST pixels. An all-invalid historical
+frame is allowed. No assembled volumes are written to disk.
+
+Only Himawari is supported for now (`data.satellite: himawari`).
+Existing volume visualization scripts still expect legacy NPZ products.
+
 Satellite metadata enables later extension, but this preprocessor reads only
 Himawari; GCOM-C reprojection and temporal matching are not implemented.
 

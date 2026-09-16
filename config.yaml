@@ -4,6 +4,8 @@ data:
   patch_size: 256
   time_steps: 9
   time_interval_hours: 6
+  satellite: himawari
+  max_cloud_fraction: 0.5  # New frame format: filter targets, not historical frames
   min_temp: 0.0
   max_temp: 35.0
   anomaly_range: 5.0

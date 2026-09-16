@@ -350,6 +350,8 @@ def main() -> None:  # 学習処理: 実データまたはsyntheticで異常補�
     else:
         assert args.data_root is not None
         loader = create_himawari_loader(args.data_root, config, stage="anomaly")
+        if loader.dataset.selection_counts:
+            print(f"Sample selection: {loader.dataset.selection_counts}")
         print(
             f"Loaded {len(loader.dataset)} Himawari samples from {args.data_root}. "
             "Data-assimilation fields are absent, so adversarial loss is disabled."
