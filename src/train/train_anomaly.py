@@ -20,8 +20,9 @@ from src.losses import (
     masked_mse_loss,
 )
 from src.datasets.himawari_patch_dataset import create_himawari_loader
-from src.models import AnomalyInpaintingGenerator, Discriminator
+from src.models import AnomalyInpaintingGenerator, AverageEstimationGenerator, Discriminator
 from src.utils.config import load_config
+from src.utils.normalization import anomaly_to_sst_scale
 
 
 class SyntheticAnomalyDataset(Dataset[dict[str, torch.Tensor]]):  # 学習処理: 形状確認用の異常補完サンプルを乱数で作る
@@ -80,6 +81,8 @@ class SyntheticAnomalyDataset(Dataset[dict[str, torch.Tensor]]):  # 学習処理
             "target_sst": target_sst,
             "target_mask": target_mask,
             "weekly_average": weekly_average,
+            "monthly_average": weekly_average.unsqueeze(1).clone(),
+            "monthly_mask": torch.ones_like(weekly_average).unsqueeze(1),
             "assimilation_sst": assimilation_sst,
         }
 
@@ -159,6 +162,21 @@ def build_anomaly_training_components(
     return generator, discriminator, optimizer_g, optimizer_d
 
 
+def load_frozen_average_generator(checkpoint_path, config, device):
+    """Load stage one once, checking available normalization metadata."""
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
+    if "config" in checkpoint:
+        saved = checkpoint["config"]["data"]
+        for key in ("time_steps", "min_temp", "max_temp", "time_interval_hours", "satellite"):
+            if key in saved and key in config["data"] and saved[key] != config["data"][key]:
+                raise ValueError(f"Average checkpoint data.{key} differs from training config")
+    model = AverageEstimationGenerator(time_steps=int(config["data"]["time_steps"])).to(device)
+    model.load_state_dict(checkpoint.get("generator_state_dict", checkpoint))
+    model.requires_grad_(False)
+    model.eval()
+    return model
+
+
 def train_one_epoch(
     *,
     generator: AnomalyInpaintingGenerator,
@@ -169,19 +187,19 @@ def train_one_epoch(
     config: Mapping[str, Any],
     device: torch.device,
     max_batches: int | None = None,
+    average_generator: AverageEstimationGenerator | None = None,
 ) -> dict[str, float]:  # 学習処理: 生成器と識別器を交互に1エポック更新する
     generator.train()
     discriminator.train()
+    if average_generator is not None:
+        average_generator.requires_grad_(False)
+        average_generator.eval()
 
     loss_config = config["loss"]
     lambda_rec = float(loss_config["lambda_ano_rec"])
     lambda_adv = float(loss_config["lambda_ano_adv"])
     data_config = config["data"]
-    anomaly_to_sst_scale = (
-        2.0
-        * float(data_config["anomaly_range"])
-        / (float(data_config["max_temp"]) - float(data_config["min_temp"]))
-    )
+    anomaly_scale = anomaly_to_sst_scale(data_config)
     use_amp = bool(config["training"].get("mixed_precision", False)) and device.type == "cuda"
 
     def autocast_context():
@@ -198,7 +216,16 @@ def train_one_epoch(
             break
 
         batch = move_batch_to_device(raw_batch, device)
-        weekly_average = batch["weekly_average"]
+        if average_generator is None:
+            # Retained for isolated synthetic tests; real CLI requires stage one.
+            weekly_average = batch["weekly_average"]
+        else:
+            with torch.no_grad(), autocast_context():
+                weekly_average = average_generator(
+                    batch["sst_volume"], batch["mask_volume"],
+                    batch["monthly_average"], batch["monthly_mask"],
+                )
+            weekly_average = weekly_average.detach()
         weekly_average_5d = weekly_average.unsqueeze(2)
         target_sst = batch["target_sst"]
         target_mask = batch["target_mask"]
@@ -208,7 +235,7 @@ def train_one_epoch(
                 batch["mask_volume"],
                 weekly_average_5d,
             )
-            pred_sst = weekly_average + pred_anomaly * anomaly_to_sst_scale
+            pred_sst = weekly_average + pred_anomaly * anomaly_scale
         use_adversarial = "assimilation_sst" in batch and lambda_adv > 0.0
         if use_adversarial:
             optimizer_d.zero_grad(set_to_none=True)
@@ -282,7 +309,7 @@ def parse_args() -> argparse.Namespace:  # 学習処理: configやsynthetic指�
     parser.add_argument(
         "--average-checkpoint",
         default=None,
-        help="Accepted for CLI compatibility; not used by synthetic option A.",
+        help="Frozen average-generator checkpoint; required for real-data training.",
     )
     parser.add_argument(
         "--synthetic",
@@ -336,9 +363,20 @@ def main() -> None:  # 学習処理: 実データまたはsyntheticで異常補�
     if not args.synthetic and args.data_root is None:
         raise ValueError("Real-data training requires --data-root.")
 
+    if not args.synthetic and args.average_checkpoint is None:
+        raise ValueError("Real-data anomaly training requires --average-checkpoint.")
     config = apply_cli_overrides(load_config(args.config), args)
+    config["training"]["average_checkpoint"] = (
+        str(Path(args.average_checkpoint).resolve()) if args.average_checkpoint else None
+    )
     set_seed(int(config.get("seed", 42)))
     device = resolve_device(str(config["training"]["device"]))
+    average_generator = (
+        load_frozen_average_generator(args.average_checkpoint, config, device)
+        if args.average_checkpoint else None
+    )
+    print("Weekly baseline: frozen average generator" if average_generator is not None
+          else "Weekly baseline: synthetic observed average (isolated debug mode)")
     batch_size = int(config["training"]["batch_size"])
     epochs = int(config["training"]["epochs"])
     if args.synthetic:
@@ -372,6 +410,7 @@ def main() -> None:  # 学習処理: 実データまたはsyntheticで異常補�
             config=config,
             device=device,
             max_batches=args.max_batches,
+            average_generator=average_generator,
         )
         epoch = epoch_index + 1
         print(

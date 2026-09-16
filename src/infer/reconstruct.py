@@ -11,6 +11,7 @@ import torch
 
 from src.models import AnomalyInpaintingGenerator, AverageEstimationGenerator
 from src.utils.config import load_config
+from src.utils.normalization import anomaly_to_sst_scale
 
 
 REQUIRED_INPUT_KEYS = (
@@ -42,6 +43,11 @@ def _ensure_5d_volume(tensor: torch.Tensor, name: str) -> torch.Tensor:  # 推�
 
 def load_reconstruction_input(path: str | Path) -> dict[str, torch.Tensor]:  # 推論処理: 推論に必要なnpz入力をまとめて読む
     """Load inference inputs.
+
+    Inputs must already use the training SST normalization; missing inputs
+    must be zero-filled with explicit validity masks. Raw frame products are
+    not accepted directly. Outputs pred_weekly/pred_sst are normalized SST;
+    pred_anomaly is the unit anomaly output (multiply by anomaly_range for C).
 
     The current implementation supports .npz files. Other formats can reuse the
     dataset loader adapter pattern when real-data integration is added.
@@ -100,7 +106,7 @@ def run_reconstruction(
             inputs["mask_volume"],
             pred_weekly.unsqueeze(2),
         )
-        pred_sst = pred_weekly + pred_anomaly
+        pred_sst = pred_weekly + pred_anomaly * anomaly_to_sst_scale(config["data"])
 
     output = {
         "pred_weekly": pred_weekly.detach().cpu().numpy(),

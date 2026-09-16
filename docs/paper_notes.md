@@ -1,3 +1,6 @@
+> 実装状況と論文との差分は[再現監査](reproduction_audit.md)を参照してください。
+> 本文は初期設計メモです。単純な平均＋偏差の例は単位換算を省略しており、現在の正規化値にはそのまま適用できません。
+
 # paper_notes.md
 
 # Notes Mapping the Paper to the PyTorch Implementation

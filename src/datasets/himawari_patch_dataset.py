@@ -137,13 +137,13 @@ class HimawariPatchDataset(Dataset[dict[str, torch.Tensor]]):
             "sst_volume": self._normalized_field(sst, volume_valid),
             "mask_volume": torch.from_numpy(volume_valid.astype(np.float32)),
             "weekly_average": self._normalized_field(weekly, weekly_valid),
+            "monthly_average": self._normalized_field(monthly, monthly_valid),
+            "monthly_mask": torch.from_numpy(monthly_valid.astype(np.float32)),
         }
 
         if self.stage == "average":
             return {
                 **common,
-                "monthly_average": self._normalized_field(monthly, monthly_valid),
-                "monthly_mask": torch.from_numpy(monthly_valid.astype(np.float32)),
                 "weekly_mask": torch.from_numpy(weekly_valid.astype(np.float32)),
             }
 
