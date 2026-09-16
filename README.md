@@ -1,5 +1,11 @@
 # SST Anomaly Inpainting
 
+**Reproduction status:** runnable baseline, not a complete reproduction of the
+paper. See [the reproduction audit](docs/reproduction_audit.md) for verified
+features, methodological differences and remaining work. Real anomaly training
+uses a frozen average-generator checkpoint; random cloud masks are not yet applied.
+
+
 PyTorch implementation scaffold for the two-stage SST reconstruction method:
 
 1. Average Estimation Generator
@@ -56,7 +62,8 @@ The training dataset auto-detects the `frames/` directory. Pass the parent
 
 ```bash
 python -m src.train.train_average --config config.yaml --data-root data/frames256
-python -m src.train.train_anomaly --config config.yaml --data-root data/frames256
+python -m src.train.train_anomaly --config config.yaml --data-root data/frames256 \
+  --average-checkpoint checkpoints/average/latest.pth
 ```
 
 For each target, the loader selects the same grid cell at exact offsets
@@ -101,10 +108,36 @@ python -m src.train.train_average \
 
 python -m src.train.train_anomaly \
   --config config.yaml \
-  --data-root src/himawaridata/himawari_sst_patches256
+  --data-root src/himawaridata/himawari_sst_patches256 \
+  --average-checkpoint checkpoints/average/latest.pth
 ```
 
 Current preprocessing outputs do not contain data-assimilation SST fields.
 Therefore these real-data commands train with reconstruction losses only and
 report zero discriminator/adversarial loss. The adversarial physical-model loss
-becomes available after aligned data-assimilation fields are added.
+requires a data-assimilation loader integration. Exact observation/assimilation
+location-time pairs are not required by the paper.
+
+## Inference units
+
+`src.infer.reconstruct` accepts preassembled, normalized volume NPZ inputs,
+not the raw frame products. `pred_weekly` and `pred_sst` use SST normalization;
+`pred_anomaly` is a unit anomaly in [-1,1]. Reconstructed normalized SST is
+`pred_weekly + pred_anomaly * 2 * anomaly_range / (max_temp - min_temp)`.
+Use the training config for inference. Convert final SST to Celsius with
+`(pred_sst + 1) * (max_temp - min_temp) / 2 + min_temp`.
+
+## Connecting the two training stages
+
+Train the average generator first, then pass its checkpoint with
+`--average-checkpoint`. Real-data anomaly training requires this argument.
+Stage one is loaded once, set to eval mode, and frozen. Every batch feeds SST,
+validity masks, monthly SST and monthly masks into it under no_grad; its predicted
+weekly SST is the anomaly baseline and is used in the final SST sum. The observed
+weekly SST is not used as the baseline. Only the anomaly generator (and, when
+available, its discriminator) is updated. The checkpoint path is recorded in the
+anomaly checkpoint config. Available temperature/time/satellite metadata is checked
+for compatibility; bare state_dict checkpoints cannot provide that metadata.
+Synthetic debug training without a checkpoint retains its observed-average path.
+Existing frame products require no regeneration. Artificial cloud masking remains
+separate unfinished work.
