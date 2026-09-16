@@ -1,4 +1,8 @@
-"""Create aligned 9-time-step SST patches and cloud masks from Himawari data.
+"""Create single-observation SST patches (default) or legacy nine-frame volumes.
+
+Default output: frames/himawari/*.npz and separate averages/himawari/*.npz.
+No cloud filtering is applied to frame storage; selection belongs to the loader.
+The following description applies to --format legacy-volumes:
 
 The geographic study area is first identified as 17--50 N, 117--150 E, but
 the intermediate 1650 x 1650 arrays are not saved.  Its centered 1536 x 1536
@@ -11,8 +15,9 @@ by observation time and grid position, so training can draw a mask from a
 different observation to create artificial missing regions.
 
 The JAXA GHRSST L3C product already contains the result of cloud screening.
-Its ``quality_level`` and valid SST pixels are converted to Hirahara et al.'s
-binary convention: 1 = cloud-screened missing ocean; 0 = clear ocean or land.
+Its ``quality_level`` and valid SST pixels are converted to the storage
+convention: 1 = cloud-screened missing ocean; 0 = clear ocean or land.
+The loader converts this to a valid-observation mask for the network.
 Land is explicitly removed with the GHRSST ``l2p_flags`` land bit, so land
 shapes never enter the training cloud-mask pool. Hirahara et al. cite
 Merchant et al. (2005), "Probabilistic
@@ -450,8 +455,12 @@ def add_temporal_averages_to_samples(
     weekly_min_observations: int = DEFAULT_WEEKLY_MIN_OBSERVATIONS,
     monthly_min_observations: int = DEFAULT_MONTHLY_MIN_OBSERVATIONS,
     overwrite: bool = False,
+    averages_root: Path | None = None,
 ) -> tuple[int, int, int]:
-    """Attach Hirahara-style same-hour 7/30-day averages to saved samples.
+    """Compute same-hour 7/30-day averages for saved observations.
+
+    With averages_root, write separate products without modifying observations.
+    Otherwise update legacy volume files in place.
 
     Only targets with a complete 30-calendar-day source window are processed.
     Pixel averages ignore cloudy/missing SSTs; pixels below the paper's minimum
@@ -502,7 +511,7 @@ def add_temporal_averages_to_samples(
         weekly_count = np.zeros(grid_shape, dtype=np.uint16)
 
         for timestamp in timestamps:
-            sst, cloud_mask, _, _ = read_sst_and_mask_patch(
+            sst, cloud_mask, lat, lon = read_sst_and_mask_patch(
                 indexed_files[timestamp],
                 grid_lat_slice,
                 grid_lon_slice,
@@ -549,8 +558,9 @@ def add_temporal_averages_to_samples(
                 )
                 if not sample_path.exists():
                     continue
-                if not overwrite:
-                    with np.load(sample_path, allow_pickle=False) as archive:
+                average_path = (averages_root / sample_path.name) if averages_root is not None else sample_path
+                if not overwrite and average_path.exists():
+                    with np.load(average_path, allow_pickle=False) as archive:
                         if "weekly_average" in archive and "monthly_average" in archive:
                             skipped_existing += 1
                             continue
@@ -558,11 +568,25 @@ def add_temporal_averages_to_samples(
                 local_x = lon_slice.start - grid_lon_slice.start
                 patch_y = slice(local_y, local_y + (lat_slice.stop - lat_slice.start))
                 patch_x = slice(local_x, local_x + (lon_slice.stop - lon_slice.start))
-                update_sample_with_temporal_averages(
-                    sample_path,
-                    weekly_average_grid[patch_y, patch_x],
-                    monthly_average_grid[patch_y, patch_x],
-                )
+                if averages_root is None:
+                    update_sample_with_temporal_averages(
+                        sample_path,
+                        weekly_average_grid[patch_y, patch_x],
+                        monthly_average_grid[patch_y, patch_x],
+                    )
+                else:
+                    from src.himawaridata.frame_preprocessing import atomic_save_npz
+                    atomic_save_npz(
+                        average_path,
+                        format_version=np.asarray(2),
+                        satellite=np.asarray("himawari"),
+                        target_timestamp=np.asarray(timestamp.isoformat()),
+                        grid_row_column=np.asarray([row, column], dtype=np.int16),
+                        lat=lat[patch_y], lon=lon[patch_x],
+                        weekly_average=weekly_average_grid[patch_y, patch_x][None],
+                        monthly_average=monthly_average_grid[patch_y, patch_x][None, None],
+                        sst_units=np.asarray("degree_Celsius"),
+                    )
                 updated += 1
 
     return updated, skipped_existing, skipped_incomplete_history
@@ -942,18 +966,21 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("input", nargs="?", type=Path, default=base / "himawari_sst_data")
     parser.add_argument(
-        "output", nargs="?", type=Path, default=base / "himawari_sst_patches256"
+        "output", nargs="?", type=Path, default=base / "himawari_sst_frames256"
     )
     parser.add_argument("--lat-min", type=float, default=DEFAULT_LAT_MIN)
     parser.add_argument("--lat-max", type=float, default=DEFAULT_LAT_MAX)
     parser.add_argument("--lon-min", type=float, default=DEFAULT_LON_MIN)
     parser.add_argument("--lon-max", type=float, default=DEFAULT_LON_MAX)
     parser.add_argument("--patch-size", type=int, default=DEFAULT_PATCH_SIZE)
-    parser.add_argument("--time-steps", type=int, default=DEFAULT_TIME_STEPS)
-    parser.add_argument("--interval-hours", type=int, default=DEFAULT_TIME_INTERVAL_HOURS)
+    parser.add_argument("--time-steps", type=int, default=DEFAULT_TIME_STEPS, help="Legacy volumes only")
+    parser.add_argument("--interval-hours", type=int, default=DEFAULT_TIME_INTERVAL_HOURS, help="Legacy volumes only")
     parser.add_argument("--min-quality-level", type=int, choices=range(6), default=4)
-    parser.add_argument("--max-cloud-fraction", type=float, default=0.5)
-    parser.add_argument("--max-sequences", type=int)
+    parser.add_argument("--max-cloud-fraction", type=float, default=0.5, help="Legacy volumes only; frames retain all observations")
+    parser.add_argument("--format", choices=("frames", "legacy-volumes"), default="frames",
+                        help="frames: one observation per NPZ; legacy-volumes: nine-frame NPZ")
+    parser.add_argument("--max-frames", type=int, help="Limit observation timestamps (frames format)")
+    parser.add_argument("--max-sequences", type=int, help="Legacy format only")
     parser.add_argument(
         "--cloud-mask-pool",
         type=Path,
@@ -976,6 +1003,21 @@ def main() -> None:
     args = parse_args()
     if not args.input.is_dir():
         raise ValueError("Patch extraction input must be a directory of NetCDF files.")
+    if args.format == "frames":
+        if args.max_sequences is not None or args.cloud_mask_pool is not None:
+            raise ValueError("For frames format use --max-frames; masks are stored inside each NPZ.")
+        from src.himawaridata.frame_preprocessing import create_observation_patches
+        create_observation_patches(
+            args.input, args.output, patch_size=args.patch_size,
+            lat_min=args.lat_min, lat_max=args.lat_max,
+            lon_min=args.lon_min, lon_max=args.lon_max,
+            min_quality_level=args.min_quality_level,
+            max_frames=args.max_frames, overwrite=args.overwrite,
+            generate_temporal_averages=not args.skip_temporal_averages,
+        )
+        return
+    if args.max_frames is not None:
+        raise ValueError("--max-frames is only supported by frames format")
     count = create_training_patches(
         args.input,
         args.output,
