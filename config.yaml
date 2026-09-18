@@ -5,7 +5,7 @@ data:
   time_steps: 9
   time_interval_hours: 6
   satellite: himawari
-  max_cloud_fraction: 0.5  # New frame format: filter targets, not historical frames
+  max_cloud_fraction: 0.5  
   min_temp: 0.0
   max_temp: 35.0
   anomaly_range: 5.0
