@@ -37,7 +37,7 @@ import numpy as np
 
 # サーバー上の入力ファイル。別の日付を標準にする場合はここを変更する。
 # コマンドラインでファイルを指定した場合は、その指定が優先される。
-DEFAULT_INPUT = Path('/data1/datasets/metro3/Metro3_hs-Std_A20250101.nc4')
+DEFAULT_INPUT = Path('/datasets/metro3/Metro3_hs-Std_A20250101.nc4')
 
 
 VARIABLES = {
