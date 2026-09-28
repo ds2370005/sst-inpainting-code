@@ -1,6 +1,7 @@
 """千葉県の海洋シミュレーションNetCDFを緯度・経度上に可視化する。
 
 リポジトリ直下からの実行例（pythonは必要なライブラリがある環境を使用）:
+    python test/visualize_simulation.py --all-times
     python test/visualize_simulation.py /path/to/Metro3_hs-Std_A20250101.nc4
     python test/visualize_simulation.py /path/to/data.nc4 --all-times
     python test/visualize_simulation.py /path/to/data.nc4 --time-index 12
@@ -8,6 +9,7 @@
     python test/visualize_simulation.py /path/to/data.nc4 --vmin 10 --vmax 25
 
 必要ライブラリ: numpy, netCDF4, matplotlib（requirements.txtに記載済み）
+入力を省略した場合は、コード内のDEFAULT_INPUTで指定したファイルを読み込む。
 標準出力先: outputs/simulation/。GUIのないサーバーでもPNGを保存できる。
 水温の標準色範囲は0〜25℃。範囲外は端の色で表示し、元データは変更しない。
 塩分の標準色範囲は選択データの最小値〜最大値。
@@ -31,6 +33,11 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from netCDF4 import Dataset, num2date
 import numpy as np
+
+
+# サーバー上の入力ファイル。別の日付を標準にする場合はここを変更する。
+# コマンドラインでファイルを指定した場合は、その指定が優先される。
+DEFAULT_INPUT = Path('/data1/datasets/metro3/Metro3_hs-Std_A20250101.nc4')
 
 
 VARIABLES = {
@@ -135,7 +142,8 @@ def visualize(path: Path, *, variable='to', time_index=0, depth_index=0,
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument('input', type=Path, help='海洋シミュレーションの.nc4ファイル')
+    parser.add_argument('input', type=Path, nargs='?', default=DEFAULT_INPUT,
+                        help=f'海洋シミュレーションの.nc4ファイル（省略時: {DEFAULT_INPUT}）')
     parser.add_argument('--variable', choices=VARIABLES, default='to', help='to: 水温（既定）, so: 塩分')
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--time-index', type=int, default=0, help='時刻の添字（0始まり、既定0）')
