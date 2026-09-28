@@ -12,7 +12,9 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT))
-from test.frame_visualization import main
+# 同じフォルダの共通処理を優先し、標準ライブラリ等のtestとの衝突を避ける。
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from frame_visualization import main
 
 DEFAULT_DATA_ROOT = ROOT/'data/frames256'
 DEFAULT_CONFIG = ROOT/'config.yaml'
