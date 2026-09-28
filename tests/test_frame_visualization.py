@@ -24,7 +24,7 @@ def frames(root):
 
 def test_exact_order_without_averages_and_all_cloudy_target(tmp_path):
     expected=frames(tmp_path)
-    paths,products=load_sequence(tmp_path,patch_size=2)
+    paths,products=load_sequence(tmp_path,target=expected[-1],patch_size=2)
     assert paths==expected
     assert [p['sst'][0,0] for p in products]==list(range(10,19))
     direct,_=load_sequence(expected[0].parent,target=expected[-1].name,patch_size=2)
@@ -53,4 +53,23 @@ def test_misaligned_or_malformed_observations_rejected(tmp_path,changes,reason):
     data.update(changes)
     np.savez_compressed(paths[3],**data)
     with pytest.raises(ValueError,match=reason):
+        load_sequence(tmp_path,target=paths[-1],patch_size=2)
+
+
+def test_auto_selection_skips_empty_sequence(tmp_path):
+    paths=frames(tmp_path)
+    # r00 has finite temperatures but all are masked; r01 has valid ocean.
+    for path in paths:
+        with np.load(path) as archive:
+            data=dict(archive)
+        data.update(grid_row_column=[0,1],cloud_mask=np.zeros((2,2),dtype=np.uint8))
+        np.savez_compressed(path.with_name(path.name.replace('c00','c01')),**data)
+    selected,products=load_sequence(tmp_path,patch_size=2)
+    assert all(p.name.endswith('c01.npz') for p in selected)
+    assert len(products)==9
+
+
+def test_auto_selection_reports_no_valid_data(tmp_path):
+    frames(tmp_path)
+    with pytest.raises(ValueError,match='すべてで有効SST画素が0'):
         load_sequence(tmp_path,patch_size=2)

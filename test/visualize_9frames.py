@@ -3,7 +3,7 @@
 python test/visualize_9frames.py --data-root /path/to/frames256
 python test/visualize_9frames.py --data-root /path/to/frames256 --target 20250403000000_r05_c05.npz
 
---targetは最後の時刻。省略時は必要な履歴が揃う最初の対象を選ぶ。
+--targetは最後の時刻。省略時は必要な履歴が揃い、有効SSTを含む最初の対象を選ぶ。
 平均NPZは不要。単一観測は--time-steps 1。出力はoutputs/。
 色範囲は有効SSTの2〜98パーセンタイル（--vmin/--vmaxで変更可能）。
 """

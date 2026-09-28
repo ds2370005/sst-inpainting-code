@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 from datetime import timedelta
+from functools import lru_cache
 from pathlib import Path
 
 import matplotlib
@@ -32,6 +33,11 @@ def load_sequence(root, *, target=None, satellite='himawari', time_steps=9,
         return [(time-timedelta(hours=interval_hours*i),row,col)
                 for i in range(time_steps-1,-1,-1)]
 
+    @lru_cache(maxsize=32)
+    def read(path):
+        return read_frame(path, satellite, patch_size)
+
+    skipped = 0
     if target is not None:
         requested = Path(target)
         path = folder/requested if requested.parent == Path('.') else requested
@@ -43,12 +49,25 @@ def load_sequence(root, *, target=None, satellite='himawari', time_steps=9,
         if missing:
             raise ValueError('必要な観測NPZが不足しています:\n'+'\n'.join(missing))
     else:
-        key = next((k for k in sorted(index) if all(t in index for t in keys_for(k))), None)
-        if key is None:
+        keys = None
+        for key in sorted(index):
+            candidate = keys_for(key)
+            if not all(t in index for t in candidate):
+                continue
+            if any((np.isfinite(read(index[t])['sst']) &
+                    (read(index[t])['cloud_mask'] == 0)).any() for t in candidate):
+                keys = candidate
+                break
+            skipped += 1
+        if keys is None:
+            if skipped:
+                raise ValueError(f'履歴が揃う{skipped}候補すべてで有効SST画素が0です。'
+                                 'SSTのNaNとcloud_maskを確認してください。'
+                                 '雲マスクだけを見る場合は--targetで対象を指定できます。')
             raise ValueError(f'同一区画で{interval_hours}時間間隔の{time_steps}枚が揃う対象がありません')
-        keys = keys_for(key)
+        print(f'自動選択: {index[key].name}（有効SSTが0の{skipped}候補をスキップ）')
     selected = [index[k] for k in keys]
-    products = [read_frame(p,satellite,patch_size) for p in selected]
+    products = [read(p) for p in selected]
     reference = products[-1]
     for product,path in zip(products,selected):
         if any(not np.array_equal(product[k],reference[k]) for k in ('lat','lon')):
@@ -60,7 +79,7 @@ def main(kind, default_data_root, default_config):
     parser = argparse.ArgumentParser(description='1時刻1NPZの観測を同一区画・古い順に並べて可視化します。')
     parser.add_argument('--data-root',type=Path,default=default_data_root,
                         help='frames/を含む親、またはframes/himawari/を指定')
-    parser.add_argument('--target',help='最後の時刻のNPZ名またはパス。省略時は履歴が揃う最初の対象')
+    parser.add_argument('--target',help='最後の時刻のNPZ名またはパス。省略時は履歴が揃い、有効SSTを含む最初の対象')
     parser.add_argument('--config',type=Path,default=default_config)
     parser.add_argument('--time-steps',type=int,help='枚数。1なら単一観測を表示')
     parser.add_argument('--interval-hours',type=int)
@@ -79,6 +98,16 @@ def main(kind, default_data_root, default_config):
         cloud = np.stack([p['cloud_mask'] for p in products])
         sst = np.stack([p['sst'] for p in products])
         valid = np.isfinite(sst) & (cloud==0)
+        for path, product, frame, mask, usable in zip(paths, products, sst, cloud, valid):
+            print(f'入力: {path}\n'
+                  f'  緯度: {product["lat"].min():.4f}〜{product["lat"].max():.4f}; '
+                  f'経度: {product["lon"].min():.4f}〜{product["lon"].max():.4f}; '
+                  f'有限SST: {np.isfinite(frame).sum()}/{frame.size}; '
+                  f'雲・欠損マスク率: {mask.mean():.2%}; '
+                  f'有効SST: {usable.sum()}/{usable.size}')
+        if kind == 'sst' and not valid.any():
+            raise ValueError('選択した全時刻に有効SSTがありません。空の水温図は保存しません。'
+                             '--targetを外して自動選択するか、別区画を指定してください。')
         values = cloud if kind == 'mask' else np.ma.array(sst,mask=~valid)
         if kind == 'mask':
             cmap = ListedColormap(['white','black'])
@@ -123,9 +152,7 @@ def main(kind, default_data_root, default_config):
             fig.savefig(output,dpi=150)
         finally:
             plt.close(fig)
-        for p in paths:
-            print('入力:',p)
-        print(f'形状: {values.shape}; 有効SST率: {valid.mean():.1%}')
+        print(f'形状: {values.shape}; 有効SST: {valid.sum()}/{valid.size} ({valid.mean():.4%})')
         print('保存先:',output.resolve())
     except (OSError,ValueError,KeyError) as exc:
         parser.exit(1,f'エラー: {exc}\n')
