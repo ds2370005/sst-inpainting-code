@@ -1,5 +1,6 @@
 """Orchestrator tests with fake children: no downloads or real training."""
 import importlib.util
+import csv
 import json
 from pathlib import Path
 import subprocess
@@ -51,6 +52,12 @@ def test_stage_order_and_checkpoint_handoff(setup):
         log.write_text('ok')
     result=runner.run(args,execute)
     assert result['status']=='complete'
+    assert result['elapsed_seconds'] >= sum(s['elapsed_seconds'] for s in result['stages'].values())
+    assert all(s['elapsed_seconds'] >= 0 and s['finished_at'] for s in result['stages'].values())
+    with (tmp/'run/timings.csv').open() as handle:
+        timings = list(csv.DictReader(handle))
+    assert [r['stage'] for r in timings] == ['average', 'anomaly', 'reconstruct', 'total']
+    assert all(r['status'] == 'complete' for r in timings)
     assert [c[3] for c in calls]==['src.train.train_average','src.train.train_anomaly','src.infer.reconstruct']
     assert calls[1][calls[1].index('--average-checkpoint')+1]==str(tmp/'run/checkpoints/average/latest.pth')
     assert '--max-batches' in calls[0]
@@ -68,6 +75,10 @@ def test_failure_stops_later_stages(setup):
     assert len(calls)==1
     status=json.loads((tmp/'fail/run.json').read_text())
     assert status['status']=='failed' and status['stages']['average']['status']=='failed'
+    assert status['elapsed_seconds'] >= status['stages']['average']['elapsed_seconds'] >= 0
+    with (tmp/'fail/timings.csv').open() as handle:
+        timings = list(csv.DictReader(handle))
+    assert [r['status'] for r in timings] == ['failed', 'failed']
 
 
 def test_preprocess_only(setup):

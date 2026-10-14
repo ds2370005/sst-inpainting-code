@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+import csv
+import time
 from datetime import datetime
 import json
 import os
@@ -178,6 +180,8 @@ def validate_input(path, config):
 
 
 def run(args, executor=execute):
+    total_started = time.perf_counter()
+    started_at = datetime.now().astimezone().isoformat()
     config = load_config(args.config)
     for name in ('device', 'epochs', 'batch_size', 'num_workers'):
         value = getattr(args, name)
@@ -211,16 +215,18 @@ def run(args, executor=execute):
     data_root = args.data_root or args.run_dir / 'data'
     average = args.average_checkpoint or args.run_dir / 'checkpoints/average/latest.pth'
     anomaly = args.anomaly_checkpoint or args.run_dir / 'checkpoints/anomaly/latest.pth'
-    state = dict(status='running', started_at=datetime.now().astimezone().isoformat(),
+    state = dict(status='running', started_at=started_at,
                  stages={}, data_root=str(data_root), smoke=args.smoke,
                  request={key: str(value) if isinstance(value, Path) else value for key, value in vars(args).items()})
     state_path = args.run_dir / 'run.json'
     write_json(state_path, state)
     current = None
+    stage_started = None
     try:
         for stage in args.stages:
             current = stage
-            state['stages'][stage] = dict(status='running')
+            stage_started = time.perf_counter()
+            state['stages'][stage] = dict(status='running', started_at=datetime.now().astimezone().isoformat())
             write_json(state_path, state)
             print(f'=== {stage} ===', flush=True)
             prefix = [sys.executable, '-u', '-m']
@@ -267,17 +273,27 @@ def run(args, executor=execute):
                     for key in ('pred_weekly', 'pred_anomaly', 'pred_sst'):
                         if not np.isfinite(f[key]).all():
                             raise ValueError(f'Nonfinite reconstruction: {key}')
-            state['stages'][stage]['status'] = 'complete'
+            state['stages'][stage].update(status='complete', finished_at=datetime.now().astimezone().isoformat(),
+                                          elapsed_seconds=time.perf_counter()-stage_started)
+            print(f'{stage}: {state["stages"][stage]["elapsed_seconds"]:.2f} seconds', flush=True)
             write_json(state_path, state)
         state['status'] = 'complete'
     except BaseException as exc:
         state['status'] = 'interrupted' if isinstance(exc, KeyboardInterrupt) else 'failed'
         if current:
-            state['stages'][current].update(status=state['status'], error=str(exc))
+            state['stages'][current].update(status=state['status'], error=str(exc),
+                finished_at=datetime.now().astimezone().isoformat(), elapsed_seconds=time.perf_counter()-stage_started)
         raise
     finally:
         state['finished_at'] = datetime.now().astimezone().isoformat()
+        state['elapsed_seconds'] = time.perf_counter()-total_started
+        with (args.run_dir/'timings.csv').open('w', newline='', encoding='utf-8') as handle:
+            writer = csv.writer(handle)
+            writer.writerow(['stage', 'status', 'elapsed_seconds', 'started_at', 'finished_at'])
+            for name, info in list(state['stages'].items()) + [('total', state)]:
+                writer.writerow([name, info['status'], info.get('elapsed_seconds'), info.get('started_at'), info.get('finished_at')])
         write_json(state_path, state)
+    print(f'Total elapsed: {state["elapsed_seconds"]:.2f} seconds', flush=True)
     print(f'Completed. Results: {args.run_dir}', flush=True)
     return state
 

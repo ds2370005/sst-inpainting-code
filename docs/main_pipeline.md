@@ -64,7 +64,8 @@ python3 main.py --run-dir outputs/inference_001 --start-at reconstruct \
 ```text
 outputs/experiment_001/
 ├── config.yaml                  # 上書き設定を含む実行時設定
-├── run.json                     # 工程、実行コマンド、完了/失敗状態
+├── run.json                     # 工程、実行コマンド、完了/失敗状態、実行時間
+├── timings.csv                  # 全体・各工程の秒数と開始/終了日時
 ├── logs/
 │   ├── average.log
 │   ├── anomaly.log
@@ -95,3 +96,35 @@ python3 visualize/visualize_epochsmoke.py \
 既存の5枚比較に加えて、入力時系列SST、欠損マスク、観測との比較、元の前処理済み全域SSTと切り取り枠、保存済み雲マスク、観測週平均、確認用JSONを出力します。元画像関連には `preview_input.json` と前処理済みデータが必要です。元のNetCDF全域ではなく、前処理対象海域の水温を表示します。
 
 これらは**復元入力サンプル**の図です。smoke学習はシャッフルされた先頭1バッチを使うため、自動プレビューの索引0番と一致するとは限りません。今回の図は実際の最適化バッチの同一性を保証しません。観測画素上の誤差は動作確認用で、雲下の精度や未知データでの性能評価ではありません。
+
+## 実行時間と評価図
+
+今後の `main.py` 実行では、全体および各工程の `elapsed_seconds` を `run.json` に保存し、同じ情報を `timings.csv` にまとめます。単調増加時計で計測した実時間で、子プロセスの起動、データ読み込み、検査、保存を含みます。実験開始後の通常の例外や Ctrl+C による中断時にも記録します。開始前の引数・設定検査で失敗した場合や強制終了・電源断では保存を保証しません。過去の実行の正確な所要時間は復元できません。
+
+学習・推論後、別スクリプトで保存済み結果を評価できます（再学習しません）。
+
+```bash
+python3 visualize/evaluate_reconstruction.py --run-dir outputs/smoke_001
+```
+
+`evaluation/` に以下を出力します。
+
+- `metrics.json`: 有効画素数、MAE、RMSE、バイアス（推定−参照）、R²、Pearson相関係数。
+- `regression.png`: 参照と推定の画素密度図、誤差ヒストグラム、水温別の誤差。
+- `training_losses.png` / `.csv`: 平均推定・偏差推定の学習損失。ログがなければ図は省略。検証損失ではありません。
+- `runtimes.png`: 工程別所要時間。時間記録のない過去の実行では省略。
+
+標準では `outputs/preview_input.npz` の最新時刻の観測有効画素と比較します。**学習プレビューの整合性確認であり、雲下の復元精度や未知データの性能評価にはなりません。** 独自入力で推論した場合は、そのNPZを `--input /path/to/input.npz` で指定してください。
+
+SST推定は回帰なのでROCは標準では生成しません。高水温の判別を評価したい場合のみ、正例の閾値（℃）を明示してください。例えば18℃以上を正例にする場合（18℃は指定方法の例です）:
+
+```bash
+python3 visualize/evaluate_reconstruction.py --run-dir outputs/smoke_001 \
+  --temperature-threshold 18 --output-dir outputs/smoke_001/evaluation_18C
+```
+
+追加で `classification.png`（混同行列・ROC・PR曲線）と `roc_pr.csv` を保存し、JSONにROC-AUC、Average Precision、Accuracy、Precision、Recall、F1を追加します。ROC/PRのスコアは予測水温そのもので、確率ではありません。混同行列は予測水温にも同じ閾値を適用します。片方のクラスしかない場合、ROC-AUC/APは未定義として `null` とし、曲線CSVを生成しません。定数データの相関係数など未定義の指標も `null` です。これは雲検出ROCではありません。
+
+独立した正解データがある場合は `--truth /path/to/truth.npz` を指定できます。必要なキーは `sst_celsius`（℃）と `valid_mask`（1=評価対象、0=除外）、形状は `[H,W]` または `[B,1,H,W]` です。予測と同じ時刻・位置・格子・順序に事前整合させてください。形状は検査しますが、座標整合や学習との独立性は自動検証しません。GPVを参照に使った場合も、観測による真値評価と同一には扱えません。
+
+評価対象は保存された `reconstruction.npz` の範囲であり、全データセットを自動評価する処理ではありません。レポートの混在を避けるため、既存の空でない出力先への再出力は拒否します。再評価時は新しい `--output-dir` を指定してください。
