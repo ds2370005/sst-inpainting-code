@@ -80,7 +80,7 @@ def visualize(run_dir, output=None, input_path=None, dpi=150, data_root=None):
     try:
         for index, (ax, (title, values)) in enumerate(zip(axes, panels)):
             is_anomaly = index == 3
-            cmap = plt.get_cmap("coolwarm" if is_anomaly else "coolwarm").copy()
+            cmap = plt.get_cmap("coolwarm" if is_anomaly else "bwr").copy()
             cmap.set_bad("lightgray")
             image = ax.imshow(
                 np.ma.masked_invalid(values), origin="upper", cmap=cmap,
@@ -122,7 +122,7 @@ def visualize(run_dir, output=None, input_path=None, dpi=150, data_root=None):
         ])
         limit = max(anomaly_range, float(np.abs(differences).max()) if differences.size else anomaly_range)
         for ax, (title, values, is_anomaly) in zip(axes, comparisons):
-            cmap = plt.get_cmap("coolwarm" if is_anomaly else "coolwarm").copy()
+            cmap = plt.get_cmap("coolwarm" if is_anomaly else "bwr").copy()
             cmap.set_bad("lightgray")
             im = ax.imshow(
                 np.ma.masked_invalid(values), cmap=cmap, origin="upper",
@@ -158,7 +158,7 @@ def panel_grid(path, panels, low, high, title, dpi, columns=3, binary=False):
     fig, axes = plt.subplots(rows, columns, figsize=(columns*4.5, rows*4),
                              squeeze=False, constrained_layout=True)
     try:
-        cmap = plt.get_cmap("gray_r" if binary else "coolwarm").copy()
+        cmap = plt.get_cmap("gray_r" if binary else "bwr").copy()
         cmap.set_bad("lightgray")
         for ax, (label, values) in zip(axes.flat, panels):
             im = ax.imshow(np.ma.masked_invalid(values), vmin=low, vmax=high, cmap=cmap)
@@ -228,7 +228,7 @@ def export_context(run_dir, input_path, output, config, sst, mask, observed, rec
         from matplotlib.patches import Rectangle
         fig,ax = plt.subplots(figsize=(9,7), constrained_layout=True)
         try:
-            cmap=plt.get_cmap("coolwarm").copy();cmap.set_bad("lightgray")
+            cmap=plt.get_cmap("bwr").copy();cmap.set_bad("lightgray")
             im=ax.imshow(np.ma.masked_invalid(source), cmap=cmap, vmin=low, vmax=high)
             ax.add_patch(Rectangle((x-.5,y-.5),w,h,fill=False,edgecolor="red",linewidth=2))
             ax.set_title(f"Full preprocessed SST / red: preview crop\n{record['time']} UTC")
