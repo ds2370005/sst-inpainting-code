@@ -80,7 +80,7 @@ def visualize(run_dir, output=None, input_path=None, dpi=150, data_root=None):
     try:
         for index, (ax, (title, values)) in enumerate(zip(axes, panels)):
             is_anomaly = index == 3
-            cmap = plt.get_cmap("coolwarm" if is_anomaly else "turbo").copy()
+            cmap = plt.get_cmap("coolwarm" if is_anomaly else "coolwarm").copy()
             cmap.set_bad("lightgray")
             image = ax.imshow(
                 np.ma.masked_invalid(values), origin="upper", cmap=cmap,
@@ -102,6 +102,52 @@ def visualize(run_dir, output=None, input_path=None, dpi=150, data_root=None):
             print(f"{title}: min={valid.min():.3f}, max={valid.max():.3f}, mean={valid.mean():.3f} deg C")
         else:
             print(f"{title}: no valid pixels")
+    observed_anomaly = np.where(
+        np.isfinite(observed) & np.isfinite(weekly), observed - weekly, np.nan
+    )
+    valid = np.isfinite(observed_anomaly)
+    anomaly_output = output.with_name(output.stem + "_anomaly_comparison.png")
+    fig, axes = plt.subplots(1, 4, figsize=(19, 4.8), constrained_layout=True)
+    try:
+        comparisons = [
+            ("Observed SST", observed, False),
+            ("Predicted weekly mean", weekly, False),
+            ("Observed SST - predicted weekly", observed_anomaly, True),
+            ("Network predicted anomaly", anomaly, True),
+        ]
+        # Keep both anomaly panels on the same scale without clipping observed differences.
+        differences = np.concatenate([
+            observed_anomaly[np.isfinite(observed_anomaly)],
+            anomaly[np.isfinite(anomaly)],
+        ])
+        limit = max(anomaly_range, float(np.abs(differences).max()) if differences.size else anomaly_range)
+        for ax, (title, values, is_anomaly) in zip(axes, comparisons):
+            cmap = plt.get_cmap("coolwarm" if is_anomaly else "coolwarm").copy()
+            cmap.set_bad("lightgray")
+            im = ax.imshow(
+                np.ma.masked_invalid(values), cmap=cmap, origin="upper",
+                vmin=-limit if is_anomaly else low,
+                vmax=limit if is_anomaly else high,
+            )
+            ax.set_title(title, fontsize=10)
+            ax.set_xlabel("Column")
+            ax.set_ylabel("Row")
+            fig.colorbar(im, ax=ax, label="deg C", shrink=0.8)
+        fig.suptitle("Anomaly comparison: observed difference unavailable under missing pixels")
+        fig.savefig(anomaly_output, dpi=dpi)
+    finally:
+        plt.close(fig)
+    anomaly_data = output.with_name(output.stem + "_anomaly_comparison.npz")
+    np.savez_compressed(
+        anomaly_data,
+        observed_sst_celsius=observed,
+        predicted_weekly_celsius=weekly,
+        observed_anomaly_celsius=observed_anomaly,
+        predicted_anomaly_celsius=anomaly,
+        observed_anomaly_valid_mask=valid.astype(np.uint8),
+    )
+    print(f"Saved: {anomaly_output}")
+    print(f"Saved: {anomaly_data}")
     export_context(run_dir, input_path, output, config, sst, mask, observed, reconstructed, data_root, dpi)
     return output
 
@@ -112,7 +158,7 @@ def panel_grid(path, panels, low, high, title, dpi, columns=3, binary=False):
     fig, axes = plt.subplots(rows, columns, figsize=(columns*4.5, rows*4),
                              squeeze=False, constrained_layout=True)
     try:
-        cmap = plt.get_cmap("gray_r" if binary else "turbo").copy()
+        cmap = plt.get_cmap("gray_r" if binary else "coolwarm").copy()
         cmap.set_bad("lightgray")
         for ax, (label, values) in zip(axes.flat, panels):
             im = ax.imshow(np.ma.masked_invalid(values), vmin=low, vmax=high, cmap=cmap)
@@ -182,7 +228,7 @@ def export_context(run_dir, input_path, output, config, sst, mask, observed, rec
         from matplotlib.patches import Rectangle
         fig,ax = plt.subplots(figsize=(9,7), constrained_layout=True)
         try:
-            cmap=plt.get_cmap("turbo").copy();cmap.set_bad("lightgray")
+            cmap=plt.get_cmap("coolwarm").copy();cmap.set_bad("lightgray")
             im=ax.imshow(np.ma.masked_invalid(source), cmap=cmap, vmin=low, vmax=high)
             ax.add_patch(Rectangle((x-.5,y-.5),w,h,fill=False,edgecolor="red",linewidth=2))
             ax.set_title(f"Full preprocessed SST / red: preview crop\n{record['time']} UTC")
