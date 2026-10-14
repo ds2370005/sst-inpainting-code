@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import math
 import random
 from collections.abc import Mapping
 from contextlib import nullcontext
@@ -379,6 +380,8 @@ def main() -> None:  # 学習処理: 実データまたはsyntheticで平均推�
             epoch_index=epoch_index,
             max_batches=args.max_batches,
         )
+        if not all(math.isfinite(value) for value in metrics.values()):
+            raise FloatingPointError(f"Nonfinite training metrics: {metrics}")
         epoch = epoch_index + 1
         print(
             f"epoch={epoch}/{epochs} "

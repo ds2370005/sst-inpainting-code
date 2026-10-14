@@ -1,3 +1,5 @@
+> 全工程の管理入口は `main.py` です。[実行手順](docs/main_pipeline.md)（前処理済みデータからの2段階学習・パッチ復元にも対応）。
+
 > 新しい一括前処理・ランダムクロップ・GPV統合ローダーは [統合前処理ガイド](docs/unified_preprocessing.md) を参照してください。以下の旧NPZ用手順と構成は互換経路です。旧前処理は `olds/` に移動しました。
 
 # SST Anomaly Inpainting
