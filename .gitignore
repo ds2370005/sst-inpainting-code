@@ -11,8 +11,6 @@ __pycache__/
 .DS_Store
 # Datasets and generated outputs
 data/*
-!data/preprocess_gpv.py
-!data/README_GPV.md
 himawari_sst_data/
 himawari_sst_data_crop1650/
 himawari_sst_patches256/

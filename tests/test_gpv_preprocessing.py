@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 spec = importlib.util.spec_from_file_location(
-    "gpv_preprocess", Path(__file__).resolve().parents[1] / "data/preprocess_gpv.py")
+    "gpv_preprocess", Path(__file__).resolve().parents[1] / "olds/data/preprocess_gpv.py")
 gpv = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(gpv)
 

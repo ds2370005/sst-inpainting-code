@@ -9,6 +9,7 @@ data:
   min_temp: 0.0
   max_temp: 35.0
   anomaly_range: 5.0
+  sample_transforms: []  # Optional module:ClassName hooks in the unified loader
 
 training:
   epochs: 30

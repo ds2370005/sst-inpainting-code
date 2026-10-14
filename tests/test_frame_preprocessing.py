@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from netCDF4 import Dataset
 
-from src.himawaridata.frame_preprocessing import create_observation_patches
+from olds.himawaridata.frame_preprocessing import create_observation_patches
 
 
 def write_nc(root, when, *, shift=0):

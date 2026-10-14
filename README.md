@@ -1,8 +1,10 @@
+> 新しい一括前処理・ランダムクロップ・GPV統合ローダーは [統合前処理ガイド](docs/unified_preprocessing.md) を参照してください。以下の旧NPZ用手順と構成は互換経路です。旧前処理は `olds/` に移動しました。
+
 # SST Anomaly Inpainting
 
 衛星「ひまわり」の海面水温（SST: Sea Surface Temperature）画像について、雲によって観測できない部分を深層学習で補完する研究用プロジェクトです。PyTorchを用いて、データの前処理、学習用データの読み込み、2段階のモデル学習、パッチ単位の推論を実装しています。
 
-**現在は動作可能なベースラインであり、対象論文の完全再現や復元精度の達成を示すものではありません。** 実データ学習では再構成損失を使用し、人工雲マスクの適用とデータ同化SSTによる敵対的学習は未接続です。
+**現在は動作可能なベースラインであり、対象論文の完全再現や復元精度の達成を示すものではありません。** 新しい統合ローダーはGPVを敵対的学習へ供給します。人工雲マスクの適用は未実装です。
 
 ## 目次
 
@@ -99,7 +101,7 @@
 ## コードを読む順番
 
 - **モデルを知りたい場合**：[generator.py](src/models/generator.py) → [blocks.py](src/models/blocks.py) → [discriminator.py](src/models/discriminator.py)
-- **データの作り方を知りたい場合**：[crop_nc_to_1650.py](src/himawaridata/crop_nc_to_1650.py) → [frame_preprocessing.py](src/himawaridata/frame_preprocessing.py) → [frame_index.py](src/datasets/frame_index.py) → [himawari_patch_dataset.py](src/datasets/himawari_patch_dataset.py)
+- **データの作り方を知りたい場合**：[crop_nc_to_1650.py](olds/himawaridata/crop_nc_to_1650.py) → [frame_preprocessing.py](olds/himawaridata/frame_preprocessing.py) → [frame_index.py](olds/datasets/frame_index.py) → [himawari_patch_dataset.py](olds/datasets/himawari_patch_dataset.py)
 - **学習・推論を追いたい場合**：[train_average.py](src/train/train_average.py) → [train_anomaly.py](src/train/train_anomaly.py) → [reconstruct.py](src/infer/reconstruct.py)
 - **入出力の具体例を見たい場合**：[tests/](tests/)の各機能に対応するテスト
 
@@ -137,14 +139,14 @@ python -m pip install -r requirements.txt
 まず1観測時刻だけを処理する例です。
 
 ```bash
-python -m src.himawaridata.crop_nc_to_1650 \
+python -m olds.himawaridata.crop_nc_to_1650 \
   data_raw/Himawari_raw data/frames256 --max-frames 1 --skip-temporal-averages
 ```
 
 学習用に全観測と7日／30日平均を作成する場合は、上記2オプションを外します。
 
 ```bash
-python -m src.himawaridata.crop_nc_to_1650 \
+python -m olds.himawaridata.crop_nc_to_1650 \
   data_raw/Himawari_raw data/frames256
 ```
 
@@ -169,7 +171,7 @@ python -m src.train.train_anomaly \
 
 実データ学習では`--average-checkpoint`が必須です。平均推定器は一度ロードして`eval`モードで固定し、`no_grad`で推定した週平均を偏差の基準にします。観測週平均をそのまま基準にはしません。チェックポイントにある温度・時刻・衛星等の設定は互換性を確認しますが、重みだけの`state_dict`にはその情報がありません。疑似データによるデバッグ学習では、チェックポイントなしで観測平均を使う経路も残しています。
 
-現在の実データにはデータ同化SSTが含まれないため、両段階とも再構成損失のみで学習し、識別器・敵対的損失は0になります。
+この旧NPZ経路ではGPVが含まれず、両段階とも再構成損失のみで学習します。統合前処理の出力を指定した場合はGPVによる敵対的損失が有効になります。
 
 ### 5. パッチ単位の推論
 
@@ -207,7 +209,7 @@ SST（℃） = (pred_sst + 1) × (max_temp - min_temp) / 2 + min_temp
 時系列ボリュームを保存する旧形式も明示的に選択できます。
 
 ```bash
-python -m src.himawaridata.crop_nc_to_1650 data_raw/Himawari_raw \
+python -m olds.himawaridata.crop_nc_to_1650 data_raw/Himawari_raw \
   data/legacy_patches256 --format legacy-volumes
 ```
 
@@ -284,7 +286,7 @@ python -m pytest
 **未実装・未検証の主な事項**：
 
 - 別観測から得た人工雲マスクを入力に適用する実データ学習。
-- データ同化SST用ローダーの接続と、実データでの敵対的学習。
+- 統合GPVローダーを使った実サーバーでの学習・精度検証。
 - 観測フレームを直接受け付ける推論アダプター、全域の反復パッチ復元・合成。
 - 学習・検証・評価の期間分割、ブイとの照合、RMSE／MAE／bias等の精度評価。
 - GCOM-Cへの対応（現在はひまわりのみ）。

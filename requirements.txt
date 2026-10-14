@@ -11,3 +11,4 @@ tqdm
 matplotlib
 pytest
 
+eccodes

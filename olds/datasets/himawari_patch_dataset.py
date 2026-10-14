@@ -9,7 +9,7 @@ import numpy as np
 import torch
 from torch.utils.data import Dataset
 
-from src.datasets.frame_index import build_frame_index, load_temporal_sample
+from olds.datasets.frame_index import build_frame_index, load_temporal_sample
 
 
 def normalize_sst(array: np.ndarray, min_temp: float, max_temp: float) -> np.ndarray:

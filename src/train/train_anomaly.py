@@ -19,7 +19,7 @@ from src.losses import (
     generator_adversarial_loss,
     masked_mse_loss,
 )
-from src.datasets.himawari_patch_dataset import create_himawari_loader
+from src.datasets.unified_dataset import create_training_loader
 from src.models import AnomalyInpaintingGenerator, AverageEstimationGenerator, Discriminator
 from src.utils.config import load_config
 from src.utils.normalization import anomaly_to_sst_scale
@@ -319,7 +319,7 @@ def parse_args() -> argparse.Namespace:  # 学習処理: configやsynthetic指�
     parser.add_argument(
         "--data-root",
         type=Path,
-        help="Directory containing NPZ files made by crop_nc_to_1650.py.",
+        help="Unified pipeline output directory (legacy Himawari products also supported).",
     )
     parser.add_argument(
         "--synthetic-num-samples",
@@ -387,12 +387,13 @@ def main() -> None:  # 学習処理: 実データまたはsyntheticで異常補�
         )
     else:
         assert args.data_root is not None
-        loader = create_himawari_loader(args.data_root, config, stage="anomaly")
+        loader = create_training_loader(args.data_root, config, stage="anomaly")
         if loader.dataset.selection_counts:
             print(f"Sample selection: {loader.dataset.selection_counts}")
         print(
-            f"Loaded {len(loader.dataset)} Himawari samples from {args.data_root}. "
-            "Data-assimilation fields are absent, so adversarial loss is disabled."
+            f"Loaded {len(loader.dataset)} samples from {args.data_root}. "
+            + ("GPV adversarial inputs are enabled." if hasattr(loader.dataset, "pool")
+             else "Data-assimilation fields are absent, so adversarial loss is disabled.")
         )
     generator, discriminator, optimizer_g, optimizer_d = build_anomaly_training_components(
         config,

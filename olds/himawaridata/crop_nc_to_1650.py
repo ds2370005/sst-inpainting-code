@@ -575,7 +575,7 @@ def add_temporal_averages_to_samples(
                         monthly_average_grid[patch_y, patch_x],
                     )
                 else:
-                    from src.himawaridata.frame_preprocessing import atomic_save_npz
+                    from olds.himawaridata.frame_preprocessing import atomic_save_npz
                     atomic_save_npz(
                         average_path,
                         format_version=np.asarray(2),
@@ -1006,7 +1006,7 @@ def main() -> None:
     if args.format == "frames":
         if args.max_sequences is not None or args.cloud_mask_pool is not None:
             raise ValueError("For frames format use --max-frames; masks are stored inside each NPZ.")
-        from src.himawaridata.frame_preprocessing import create_observation_patches
+        from olds.himawaridata.frame_preprocessing import create_observation_patches
         create_observation_patches(
             args.input, args.output, patch_size=args.patch_size,
             lat_min=args.lat_min, lat_max=args.lat_max,

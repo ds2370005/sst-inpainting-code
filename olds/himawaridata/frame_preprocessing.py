@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
-from src.himawaridata.crop_nc_to_1650 import (
+from olds.himawaridata.crop_nc_to_1650 import (
     add_temporal_averages_to_samples,
     build_fixed_grid,
     index_netcdf_files,
