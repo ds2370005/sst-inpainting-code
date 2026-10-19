@@ -1,5 +1,7 @@
 """Tests for the reconstruction inference pipeline."""
 
+from src.utils.checkpoint import MODEL_FORMAT
+
 from pathlib import Path
 
 import numpy as np
@@ -25,7 +27,7 @@ def _config(patch_size: int = 160, time_steps: int = 9) -> dict:
 
 
 def _save_generator_checkpoint(path: Path, model: torch.nn.Module) -> None:
-    torch.save({"generator_state_dict": model.state_dict()}, path)
+    torch.save({"model_format": MODEL_FORMAT, "generator_state_dict": model.state_dict()}, path)
 
 
 def test_run_reconstruction_writes_npz_outputs(tmp_path: Path) -> None:

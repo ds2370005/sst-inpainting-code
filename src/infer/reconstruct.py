@@ -11,6 +11,7 @@ import torch
 
 from src.models import AnomalyInpaintingGenerator, AverageEstimationGenerator
 from src.utils.config import load_config
+from src.utils.checkpoint import load_generator_state
 from src.utils.normalization import anomaly_to_sst_scale
 
 
@@ -69,8 +70,7 @@ def load_generator_checkpoint(
         checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
     except TypeError:
         checkpoint = torch.load(checkpoint_path, map_location=device)
-    state_dict = checkpoint.get("generator_state_dict", checkpoint)
-    model.load_state_dict(state_dict)
+    load_generator_state(model, checkpoint)
 
 
 def run_reconstruction(
@@ -88,7 +88,7 @@ def run_reconstruction(
     }
     time_steps = int(config["data"]["time_steps"])
     average_generator = AverageEstimationGenerator(time_steps=time_steps).to(device)
-    anomaly_generator = AnomalyInpaintingGenerator(time_steps=time_steps).to(device)
+    anomaly_generator = AnomalyInpaintingGenerator(time_steps=time_steps, anomaly_scale=anomaly_to_sst_scale(config["data"])).to(device)
     load_generator_checkpoint(average_generator, average_checkpoint, device)
     load_generator_checkpoint(anomaly_generator, anomaly_checkpoint, device)
     average_generator.eval()

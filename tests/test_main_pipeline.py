@@ -1,4 +1,6 @@
 """Orchestrator tests with fake children: no downloads or real training."""
+
+from src.utils.checkpoint import MODEL_FORMAT
 import importlib.util
 import csv
 import json
@@ -147,7 +149,7 @@ def test_checkpoint_config_mismatch(tmp_path):
     import torch
     checkpoint=tmp_path/'checkpoint.pth'
     config={'data':{'patch_size':256,'min_temp':0}}
-    torch.save({'config':config,'generator_state_dict':{}},checkpoint)
+    torch.save({'model_format':MODEL_FORMAT,'config':config,'generator_state_dict':{}},checkpoint)
     runner.validate_checkpoint(checkpoint,config)
     with pytest.raises(ValueError,match='min_temp'):
         runner.validate_checkpoint(checkpoint,{'data':{'patch_size':256,'min_temp':-2}})

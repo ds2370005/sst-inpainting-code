@@ -73,15 +73,19 @@ class EncoderDecoder2D(nn.Module):  # ネットワーク定義: 時系列特徴�
         self.e7 = DilatedConvELU(256, 256, dilation=2)
         self.e8 = DilatedConvELU(256, 256, dilation=4)
         self.e9 = DilatedConvELU(256, 256, dilation=8)
-        self.e10 = DilatedConvELU(256, 256, dilation=16)
+        self.e10 = ReflectionConv2d(256, 256, kernel_size=3, dilation=16)
 
         self.d1 = ConvELU(256, 128, kernel_size=3, stride=1)
+        self.d1_second = ConvELU(128, 128, kernel_size=3)
         self.up1 = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=False)
         self.d3 = ConvELU(128, 64, kernel_size=3, stride=1)
+        self.d3_second = ConvELU(64, 64, kernel_size=3)
         self.up2 = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=False)
         self.d5 = ConvELU(64, 32, kernel_size=3, stride=1)
+        self.d5_second = ConvELU(32, 32, kernel_size=3)
         self.up3 = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=False)
         self.d7 = ConvELU(32, 16, kernel_size=3, stride=1)
+        self.d7_second = ConvELU(16, 16, kernel_size=3)
         self.d8 = ReflectionConv2d(16, 1, kernel_size=3, stride=1)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -111,24 +115,24 @@ class EncoderDecoder2D(nn.Module):  # ネットワーク定義: 時系列特徴�
         x = self.e10(x)
         assert x.shape == (batch, 256, height // 8, width // 8), tuple(x.shape)
 
-        x = self.d1(x)
+        x = self.d1_second(self.d1(x))
         assert x.shape == (batch, 128, height // 8, width // 8), tuple(x.shape)
         x = self.up1(x)
         assert x.shape == (batch, 128, height // 4, width // 4), tuple(x.shape)
-        x = self.d3(x)
+        x = self.d3_second(self.d3(x))
         assert x.shape == (batch, 64, height // 4, width // 4), tuple(x.shape)
         x = self.up2(x)
         assert x.shape == (batch, 64, height // 2, width // 2), tuple(x.shape)
-        x = self.d5(x)
+        x = self.d5_second(self.d5(x))
         assert x.shape == (batch, 32, height // 2, width // 2), tuple(x.shape)
         x = self.up3(x)
         assert x.shape == (batch, 32, height, width), tuple(x.shape)
-        x = self.d7(x)
+        x = self.d7_second(self.d7(x))
         assert x.shape == (batch, 16, height, width), tuple(x.shape)
         x = self.d8(x)
         assert x.shape == (batch, 1, height, width), tuple(x.shape)
 
-        out = torch.tanh(x)
+        out = x.clamp(-1.0, 1.0)
         assert out.shape == (batch, 1, height, width), tuple(out.shape)
         return out
 
@@ -142,8 +146,8 @@ class AverageEstimationGenerator(nn.Module):  # ネットワーク定義: 月平
         self.time_steps = time_steps
         self.sst_projection = nn.Conv3d(2, 1, kernel_size=1)
         self.monthly_projection = nn.Conv3d(2, 1, kernel_size=1)
-        self.fusion_projection = nn.Conv3d(2, 1, kernel_size=1)
-        self.encoder_decoder = EncoderDecoder2D(in_channels=time_steps)
+        # Fig. 8: concatenate nine temporal features and one monthly feature.
+        self.encoder_decoder = EncoderDecoder2D(in_channels=time_steps + 1)
 
     def forward(
         self,
@@ -174,15 +178,8 @@ class AverageEstimationGenerator(nn.Module):  # ネットワーク定義: 月平
         assert monthly_branch_input.shape == (batch, 2, 1, height, width)
         monthly_feature = self.monthly_projection(monthly_branch_input)
         assert monthly_feature.shape == (batch, 1, 1, height, width)
-        monthly_feature = monthly_feature.repeat(1, 1, time_steps, 1, 1)
-        assert monthly_feature.shape == (batch, 1, time_steps, height, width)
-
-        x = torch.cat([sst_feature, monthly_feature], dim=1)
-        assert x.shape == (batch, 2, time_steps, height, width)
-        x = self.fusion_projection(x)
-        assert x.shape == (batch, 1, time_steps, height, width)
-        x = x.squeeze(1)
-        assert x.shape == (batch, time_steps, height, width)
+        x = torch.cat([sst_feature, monthly_feature], dim=2).squeeze(1)
+        assert x.shape == (batch, time_steps + 1, height, width)
 
         pred_weekly = self.encoder_decoder(x)
         assert pred_weekly.shape == (batch, 1, height, width), tuple(pred_weekly.shape)
@@ -192,10 +189,13 @@ class AverageEstimationGenerator(nn.Module):  # ネットワーク定義: 月平
 class AnomalyInpaintingGenerator(nn.Module):  # ネットワーク定義: 週平均からの偏差としてSST異常を補完する
     """Estimate SST anomaly relative to the predicted weekly average."""
 
-    def __init__(self, time_steps: int = 9) -> None:
+    def __init__(self, time_steps: int = 9, *, anomaly_scale: float = 2.0 * 5.0 / 35.0) -> None:
         super().__init__()
         assert time_steps > 0, f"time_steps must be positive, got {time_steps}"
         self.time_steps = time_steps
+        if not 0 < anomaly_scale < float("inf"):
+            raise ValueError("anomaly_scale must be finite and positive")
+        self.register_buffer("anomaly_scale", torch.tensor(float(anomaly_scale)))
         self.projection = nn.Conv3d(2, 1, kernel_size=1)
         self.encoder_decoder = EncoderDecoder2D(in_channels=time_steps)
 
@@ -219,7 +219,9 @@ class AnomalyInpaintingGenerator(nn.Module):  # ネットワーク定義: 週平
 
         weekly_feature = weekly_average.repeat(1, 1, time_steps, 1, 1)
         assert weekly_feature.shape == (batch, 1, time_steps, height, width)
-        anomaly_volume = (sst_volume - weekly_feature) * mask_volume
+        # Normalize temperature DIFFERENCES by anomaly_range, not the SST span.
+        anomaly_volume = ((sst_volume - weekly_feature) / self.anomaly_scale).clamp(-1, 1)
+        anomaly_volume = torch.where(mask_volume > 0, anomaly_volume, 0.0)
         assert anomaly_volume.shape == (batch, 1, time_steps, height, width)
 
         x = torch.cat([anomaly_volume, mask_volume], dim=1)

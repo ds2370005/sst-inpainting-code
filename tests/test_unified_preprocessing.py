@@ -154,3 +154,21 @@ def test_grib_depth_search_and_field_release(tmp_path):
     values,_,_,metadata=gpv.read_field(path,ec,datetime(2025,4,1,tzinfo=timezone.utc))
     np.testing.assert_allclose(values,[[0,1],[np.nan,2]],equal_nan=True,atol=1e-5)
     assert metadata['depth_m']==1 and len(released)==3
+
+
+def test_cloud_augmentation_uses_another_training_timestamp(prepared):
+    args,config,_=prepared
+    ds=UnifiedSSTDataset(args.output,config,stage='anomaly')
+    original=ds.crop
+    cloud_calls=[]
+    def capture(path,key,origin):
+        values=original(path,key,origin)
+        if key=='cloud_mask':cloud_calls.append((path,values.copy()))
+        return values
+    ds.crop=capture
+    sample=ds[0]
+    donor_path,donor_mask=cloud_calls[-1]
+    assert donor_path != ds.samples[0]['frames'][-1]
+    np.testing.assert_array_equal(sample['random_cloud_mask'].numpy()[0],1-donor_mask)
+    # The supervised target still uses the original observation mask.
+    np.testing.assert_array_equal(sample['target_mask'].numpy(),sample['mask_volume'].numpy()[:,-1])

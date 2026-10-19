@@ -18,7 +18,7 @@ def _synthetic_config(tmp_path: Path) -> dict:
     return {
         "seed": 42,
         "data": {
-            "patch_size": 160,
+            "patch_size": 256,
             "time_steps": 9,
             "time_interval_hours": 6,
             "min_temp": 0.0,
@@ -52,17 +52,17 @@ def _synthetic_config(tmp_path: Path) -> dict:
 
 
 def test_synthetic_average_dataset_shapes() -> None:
-    dataset = SyntheticAverageDataset(num_samples=2, time_steps=9, patch_size=160)
+    dataset = SyntheticAverageDataset(num_samples=2, time_steps=9, patch_size=256)
 
     sample = dataset[0]
 
-    assert sample["sst_volume"].shape == (1, 9, 160, 160)
-    assert sample["mask_volume"].shape == (1, 9, 160, 160)
-    assert sample["monthly_average"].shape == (1, 1, 160, 160)
-    assert sample["monthly_mask"].shape == (1, 1, 160, 160)
-    assert sample["weekly_average"].shape == (1, 160, 160)
-    assert sample["weekly_mask"].shape == (1, 160, 160)
-    assert sample["assimilation_weekly"].shape == (1, 160, 160)
+    assert sample["sst_volume"].shape == (1, 9, 256, 256)
+    assert sample["mask_volume"].shape == (1, 9, 256, 256)
+    assert sample["monthly_average"].shape == (1, 1, 256, 256)
+    assert sample["monthly_mask"].shape == (1, 1, 256, 256)
+    assert sample["weekly_average"].shape == (1, 256, 256)
+    assert sample["weekly_mask"].shape == (1, 256, 256)
+    assert sample["assimilation_weekly"].shape == (1, 256, 256)
 
 
 def test_train_average_one_synthetic_batch(tmp_path: Path) -> None:
@@ -97,6 +97,7 @@ def test_train_average_one_synthetic_batch(tmp_path: Path) -> None:
     )
 
     assert checkpoint_path.exists()
+    assert metrics["epoch_weight"] == 0.0  # one-epoch run is also the final epoch
     for value in metrics.values():
         assert torch.isfinite(torch.tensor(value))
 
@@ -106,7 +107,7 @@ def test_train_average_without_assimilation_uses_reconstruction_only(
 ) -> None:
     config = _synthetic_config(tmp_path)
     device = torch.device("cpu")
-    sample = SyntheticAverageDataset(num_samples=1, time_steps=9, patch_size=160)[0]
+    sample = SyntheticAverageDataset(num_samples=1, time_steps=9, patch_size=256)[0]
     sample.pop("assimilation_weekly")
     loader = DataLoader([sample], batch_size=1)
     generator, discriminator, optimizer_g, optimizer_d = build_average_training_components(

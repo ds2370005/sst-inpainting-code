@@ -147,6 +147,23 @@ class HimawariPatchDataset(Dataset[dict[str, torch.Tensor]]):
                 "weekly_mask": torch.from_numpy(weekly_valid.astype(np.float32)),
             }
 
+        if len(self.paths) == 1:
+            if cloud.shape[1] < 2:
+                raise ValueError('Anomaly augmentation needs another training image')
+            # A different timestamp in the training volume is also a donor image.
+            donor_cloud_2d = cloud[:, int(torch.randint(cloud.shape[1]-1, ()).item())]
+        else:
+            donor = int(torch.randint(len(self.paths)-1, ()).item())
+            donor += donor >= index
+            if self.samples is not None:
+                _, donor_cloud, *_ = load_temporal_sample(
+                    self.samples[donor], self.satellite, self.patch_size)
+            else:
+                with np.load(self.paths[donor], allow_pickle=False) as archive:
+                    donor_cloud = np.asarray(archive['cloud_mask_volume'])
+            donor_cloud_2d = donor_cloud[:, -1]
+        common['random_cloud_mask'] = torch.from_numpy(
+            (donor_cloud_2d == 0).astype(np.float32))
         target_valid = np.isfinite(target_sst) & (target_cloud == 0)
         return {
             **common,

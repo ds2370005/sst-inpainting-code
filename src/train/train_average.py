@@ -23,6 +23,7 @@ from src.losses import (
 from src.datasets.unified_dataset import create_training_loader
 from src.models import AverageEstimationGenerator, Discriminator
 from src.utils.config import load_config
+from src.utils.checkpoint import MODEL_FORMAT, load_generator_state
 
 
 class SyntheticAverageDataset(Dataset[dict[str, torch.Tensor]]):  # 学習処理: 形状確認用の平均推定サンプルを乱数で作る
@@ -184,7 +185,7 @@ def train_one_epoch(
     epochs = int(config["training"]["epochs"])
     lambda_rec = float(loss_config["lambda_ave_rec"])
     lambda_adv = float(loss_config["lambda_ave_adv"])
-    epoch_weight = 1.0 - float(epoch_index) / max(float(epochs), 1.0)
+    epoch_weight = max(0.0, 1.0 - float(epoch_index + 1) / max(float(epochs), 1.0))
     use_amp = bool(config["training"].get("mixed_precision", False)) and device.type == "cuda"
 
     def autocast_context():
@@ -275,6 +276,7 @@ def save_checkpoint(
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
         {
+            "model_format": MODEL_FORMAT,
             "epoch": epoch,
             "generator_state_dict": generator.state_dict(),
             "discriminator_state_dict": discriminator.state_dict(),

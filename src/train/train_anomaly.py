@@ -23,6 +23,7 @@ from src.losses import (
 from src.datasets.unified_dataset import create_training_loader
 from src.models import AnomalyInpaintingGenerator, AverageEstimationGenerator, Discriminator
 from src.utils.config import load_config
+from src.utils.checkpoint import MODEL_FORMAT, load_generator_state
 from src.utils.normalization import anomaly_to_sst_scale
 
 
@@ -81,6 +82,7 @@ class SyntheticAnomalyDataset(Dataset[dict[str, torch.Tensor]]):  # 学習処理
             "mask_volume": mask_volume,
             "target_sst": target_sst,
             "target_mask": target_mask,
+            "random_cloud_mask": self._mask(1, height, width),
             "weekly_average": weekly_average,
             "monthly_average": weekly_average.unsqueeze(1).clone(),
             "monthly_mask": torch.ones_like(weekly_average).unsqueeze(1),
@@ -148,6 +150,7 @@ def build_anomaly_training_components(
     optimizer_config = config["optimizer"]
     generator = AnomalyInpaintingGenerator(
         time_steps=int(config["data"]["time_steps"]),
+        anomaly_scale=anomaly_to_sst_scale(config["data"]),
     ).to(device)
     discriminator = Discriminator().to(device)
     optimizer_g = torch.optim.Adam(
@@ -172,10 +175,27 @@ def load_frozen_average_generator(checkpoint_path, config, device):
             if key in saved and key in config["data"] and saved[key] != config["data"][key]:
                 raise ValueError(f"Average checkpoint data.{key} differs from training config")
     model = AverageEstimationGenerator(time_steps=int(config["data"]["time_steps"])).to(device)
-    model.load_state_dict(checkpoint.get("generator_state_dict", checkpoint))
+    load_generator_state(model, checkpoint)
     model.requires_grad_(False)
     model.eval()
     return model
+
+
+def apply_random_cloud_mask(batch):
+    """Eq. (9): modify inputs only; retain original targets/masks for Eq. (7).
+
+    random_cloud_mask is a donor image's clear-sky mask (1=keep).
+    Broadcast one spatial pattern to all temporal frames, so the hidden
+    target cannot be copied from the same location in another input frame.
+    """
+    sst, valid = batch['sst_volume'], batch['mask_volume']
+    if 'random_cloud_mask' not in batch:
+        raise ValueError('Anomaly training requires random_cloud_mask from another training image')
+    keep = batch['random_cloud_mask']
+    if keep.shape != sst[:, :, -1].shape or not torch.all((keep == 0) | (keep == 1)):
+        raise ValueError('random_cloud_mask must be binary [B,1,H,W], 1=keep')
+    combined = valid * keep.unsqueeze(2)
+    return torch.where(combined > 0, sst, 0.0), combined
 
 
 def train_one_epoch(
@@ -230,10 +250,11 @@ def train_one_epoch(
         weekly_average_5d = weekly_average.unsqueeze(2)
         target_sst = batch["target_sst"]
         target_mask = batch["target_mask"]
+        masked_sst, masked_valid = apply_random_cloud_mask(batch)
         with autocast_context():
             pred_anomaly = generator(
-                batch["sst_volume"],
-                batch["mask_volume"],
+                masked_sst,
+                masked_valid,
                 weekly_average_5d,
             )
             pred_sst = weekly_average + pred_anomaly * anomaly_scale
@@ -293,6 +314,7 @@ def save_checkpoint(
     path.parent.mkdir(parents=True, exist_ok=True)
     torch.save(
         {
+            "model_format": MODEL_FORMAT,
             "epoch": epoch,
             "generator_state_dict": generator.state_dict(),
             "discriminator_state_dict": discriminator.state_dict(),

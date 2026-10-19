@@ -40,6 +40,15 @@ class UnifiedSSTDataset(Dataset):
                 raise ValueError(f'Training/preprocessing setting differs: {key}')
         self.samples=manifest['samples']
         self.selection_counts=manifest['selection_counts']
+        # One eligible crop per source timestamp; never use the target image as donor.
+        donors = {}
+        for row in self.samples:
+            for path in row['frames']:
+                donors.setdefault(path, row['origin'])
+        self.cloud_donors = list(donors.items())
+        self.cloud_donor_index = {path:i for i,(path,_) in enumerate(self.cloud_donors)}
+        if stage == 'anomaly' and len(self.cloud_donors) < 2:
+            raise ValueError('Anomaly augmentation needs at least two distinct training images')
         self.pool=manifest['gpv_pools']['weekly' if stage=='average' else 'daily']
         if not self.samples or not self.pool:raise ValueError('No eligible satellite samples or GPV pool; inspect dataset.json')
         self.transforms=tuple(transforms)
@@ -80,6 +89,15 @@ class UnifiedSSTDataset(Dataset):
         sample[key]=self.normalize(values[None])[0]
         cloud=self.crop(row['frames'][-1],'cloud_mask',origin)
         sample['cloud_mask']=torch.from_numpy(cloud[None].astype(np.float32))
+        if self.stage == 'anomaly':
+            own = self.cloud_donor_index[row['frames'][-1]]
+            donor = int(torch.randint(len(self.cloud_donors)-1, ()).item())
+            donor += donor >= own
+            path, donor_origin = self.cloud_donors[donor]
+            donor_cloud = self.crop(path, 'cloud_mask', donor_origin)
+            if not np.isin(donor_cloud, [0,1]).all():
+                raise ValueError('Donor cloud mask must be binary (1=cloud)')
+            sample['random_cloud_mask'] = torch.from_numpy((1-donor_cloud)[None].astype(np.float32))
         # Metadata is provided to hooks; only tensor dict is returned for existing training loops.
         context=dict(target_time=row['time'],origin=origin,
                      lat=self.lat[origin[0]:origin[0]+self.size],lon=self.lon[origin[1]:origin[1]+self.size],

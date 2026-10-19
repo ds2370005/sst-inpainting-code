@@ -124,6 +124,8 @@ def validate_checkpoint(path, config):
     import torch
     require_file(path)
     checkpoint = torch.load(path, map_location='cpu', weights_only=True)
+    from src.utils.checkpoint import require_model_format
+    require_model_format(checkpoint)
     if 'config' not in checkpoint:
         raise ValueError(f'Checkpoint has no configuration to validate: {path}')
     for key in ('time_steps', 'patch_size', 'time_interval_hours', 'min_temp',

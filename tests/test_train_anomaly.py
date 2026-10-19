@@ -1,5 +1,7 @@
 """Tests for the anomaly-stage synthetic training loop."""
 
+from src.utils.checkpoint import MODEL_FORMAT
+
 from pathlib import Path
 
 import torch
@@ -18,7 +20,7 @@ def _synthetic_config(tmp_path: Path) -> dict:
     return {
         "seed": 42,
         "data": {
-            "patch_size": 160,
+            "patch_size": 256,
             "time_steps": 9,
             "time_interval_hours": 6,
             "min_temp": 0.0,
@@ -52,16 +54,16 @@ def _synthetic_config(tmp_path: Path) -> dict:
 
 
 def test_synthetic_anomaly_dataset_shapes() -> None:
-    dataset = SyntheticAnomalyDataset(num_samples=2, time_steps=9, patch_size=160)
+    dataset = SyntheticAnomalyDataset(num_samples=2, time_steps=9, patch_size=256)
 
     sample = dataset[0]
 
-    assert sample["sst_volume"].shape == (1, 9, 160, 160)
-    assert sample["mask_volume"].shape == (1, 9, 160, 160)
-    assert sample["target_sst"].shape == (1, 160, 160)
-    assert sample["target_mask"].shape == (1, 160, 160)
-    assert sample["weekly_average"].shape == (1, 160, 160)
-    assert sample["assimilation_sst"].shape == (1, 160, 160)
+    assert sample["sst_volume"].shape == (1, 9, 256, 256)
+    assert sample["mask_volume"].shape == (1, 9, 256, 256)
+    assert sample["target_sst"].shape == (1, 256, 256)
+    assert sample["target_mask"].shape == (1, 256, 256)
+    assert sample["weekly_average"].shape == (1, 256, 256)
+    assert sample["assimilation_sst"].shape == (1, 256, 256)
 
 
 def test_train_anomaly_one_synthetic_batch(tmp_path: Path) -> None:
@@ -104,7 +106,7 @@ def test_train_anomaly_without_assimilation_uses_reconstruction_only(
 ) -> None:
     config = _synthetic_config(tmp_path)
     device = torch.device("cpu")
-    sample = SyntheticAnomalyDataset(num_samples=1, time_steps=9, patch_size=160)[0]
+    sample = SyntheticAnomalyDataset(num_samples=1, time_steps=9, patch_size=256)[0]
     sample.pop("assimilation_sst")
     loader = DataLoader([sample], batch_size=1)
     generator, discriminator, optimizer_g, optimizer_d = build_anomaly_training_components(
@@ -143,12 +145,12 @@ def test_frozen_average_is_used_and_only_anomaly_updates(tmp_path):
     device = torch.device("cpu")
     original = AverageEstimationGenerator(time_steps=9)
     checkpoint = tmp_path / "average.pth"
-    torch.save({"generator_state_dict": original.state_dict(), "config": config}, checkpoint)
+    torch.save({"model_format": MODEL_FORMAT, "generator_state_dict": original.state_dict(), "config": config}, checkpoint)
     average = load_frozen_average_generator(checkpoint, config, device)
     assert not average.training
     assert all(not p.requires_grad for p in average.parameters())
     before = {k: v.clone() for k, v in average.state_dict().items()}
-    sample = SyntheticAnomalyDataset(num_samples=1, time_steps=9, patch_size=160)[0]
+    sample = SyntheticAnomalyDataset(num_samples=1, time_steps=9, patch_size=256)[0]
     sample.pop("assimilation_sst")
     sample.pop("weekly_average")  # Must not read observed weekly average in connected mode.
     generator, discriminator, opt_g, opt_d = build_anomaly_training_components(config, device)
@@ -177,7 +179,7 @@ def test_average_checkpoint_rejects_normalization_mismatch(tmp_path):
     config = _synthetic_config(tmp_path)
     model = AverageEstimationGenerator(time_steps=9)
     checkpoint = tmp_path / "average.pth"
-    torch.save({"generator_state_dict": model.state_dict(), "config": config}, checkpoint)
+    torch.save({"model_format": MODEL_FORMAT, "generator_state_dict": model.state_dict(), "config": config}, checkpoint)
     config["data"]["max_temp"] = 40
     with pytest.raises(ValueError, match="max_temp"):
         load_frozen_average_generator(checkpoint, config, torch.device("cpu"))
