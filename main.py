@@ -34,6 +34,10 @@ def parse_args(argv=None):
     parser.add_argument('--average-checkpoint', type=Path)
     parser.add_argument('--anomaly-checkpoint', type=Path)
     parser.add_argument('--inference-input', type=Path, help='Optional normalized inference NPZ')
+    parser.add_argument('--full-domain-time', help='UTC timestamp: iterative full-domain reconstruction instead of a preview')
+    parser.add_argument('--weekly-stride', type=int, default=128)
+    parser.add_argument('--weekly-max-missing', type=float, default=.5)
+    parser.add_argument('--weekly-max-iterations', type=int, default=10000)
     parser.add_argument('--sample-index', type=int, default=0,
                         help='Without --inference-input, reconstruct this training sample as a preview')
     parser.add_argument('--device')
@@ -45,6 +49,10 @@ def parse_args(argv=None):
     parser.add_argument('--patches-per-frame', type=int, default=8)
     parser.add_argument('--min-quality', type=int, choices=range(6), default=4)
     args = parser.parse_args(argv)
+    if args.full_domain_time and args.inference_input:
+        parser.error('--full-domain-time cannot be combined with --inference-input')
+    if not 1 <= args.weekly_stride <= 256 or not 0 <= args.weekly_max_missing <= 1 or args.weekly_max_iterations < 1:
+        parser.error('Invalid weekly reconstruction settings')
     args.start_at = args.start_at or ('average' if args.data_root else 'preprocess')
     start, stop = STAGES.index(args.start_at), STAGES.index(args.stop_after)
     if start > stop:
@@ -198,7 +206,7 @@ def run(args, executor=execute):
             validate_checkpoint(path, config)
     if args.inference_input:
         validate_input(args.inference_input, config)
-    preview = 'reconstruct' in args.stages and not args.inference_input
+    preview = 'reconstruct' in args.stages and not args.inference_input and not args.full_domain_time
     if preview and config['data'].get('sample_transforms'):
         raise ValueError('Automatic preview does not support feature transforms; supply --inference-input or stop after anomaly')
     if args.data_root:
@@ -250,14 +258,22 @@ def run(args, executor=execute):
                 validate_checkpoint(anomaly, config)
                 destination = args.run_dir / 'outputs'
                 destination.mkdir(exist_ok=True)
-                input_path = args.inference_input or destination / 'preview_input.npz'
-                if preview:
-                    print('Reconstructing one TRAINING crop as a preview, not a held-out evaluation.', flush=True)
-                    prepare_preview(data_root, config, args.sample_index, input_path)
-                validate_input(input_path, config)
-                command = prefix + ['src.infer.reconstruct', '--config', str(config_path),
-                    '--average-checkpoint', str(average), '--anomaly-checkpoint', str(anomaly),
-                    '--input', str(input_path), '--output', str(destination / 'reconstruction.npz')]
+                if args.full_domain_time:
+                    command = prefix + ['src.infer.full_domain', '--config', str(config_path),
+                        '--data-root', str(data_root), '--target-time', args.full_domain_time,
+                        '--average-checkpoint', str(average), '--anomaly-checkpoint', str(anomaly),
+                        '--output-dir', str(destination/'full_domain'),
+                        '--stride', str(args.weekly_stride), '--max-missing', str(args.weekly_max_missing),
+                        '--max-iterations', str(args.weekly_max_iterations), '--seed', str(config.get('seed',42))]
+                else:
+                    input_path = args.inference_input or destination / 'preview_input.npz'
+                    if preview:
+                        print('Reconstructing one TRAINING crop as a preview, not a held-out evaluation.', flush=True)
+                        prepare_preview(data_root, config, args.sample_index, input_path)
+                    validate_input(input_path, config)
+                    command = prefix + ['src.infer.reconstruct', '--config', str(config_path),
+                        '--average-checkpoint', str(average), '--anomaly-checkpoint', str(anomaly),
+                        '--input', str(input_path), '--output', str(destination / 'reconstruction.npz')]
             state['stages'][stage]['command'] = command
             write_json(state_path, state)
             executor(command, args.run_dir / 'logs' / f'{stage}.log')
@@ -268,6 +284,11 @@ def run(args, executor=execute):
                 if status.get('status') != 'complete':
                     raise ValueError('Preprocessing did not finish successfully')
                 validate_data(data_root, config, args.stages, preview)
+            elif args.full_domain_time:
+                full_status = json.loads((destination/'full_domain/run.json').read_text())
+                if full_status.get('status') != 'complete':
+                    raise ValueError('Full-domain reconstruction is incomplete')
+                require_file(destination/'full_domain/full_reconstruction.npz')
             else:
                 import numpy as np
                 require_file(destination / 'reconstruction.npz')
