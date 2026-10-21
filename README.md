@@ -289,7 +289,7 @@ python -m pytest
 
 - 独立したテスト期間とブイ観測による論文同条件の評価。
 - 統合GPVローダーを使った実サーバーでの学習・精度検証。
-- 実サーバーでの全域復元の性能・精度検証（反復復元のコードは追加済み）。
+- 観測フレームを直接受け付ける推論アダプター、全域の反復パッチ復元・合成。
 - 学習・検証・評価の期間分割、ブイとの照合、RMSE／MAE／bias等の精度評価。
 - GCOM-Cへの対応（現在はひまわりのみ）。
 - GPUでの実学習・AMPの検証。現状はautocastのみでGradScalerはなく、混合精度は既定で無効。
@@ -298,5 +298,3 @@ python -m pytest
 詳細は[再現監査](docs/reproduction_audit.md)を参照してください。ただし、監査記録には平均推定器の接続前の記述が残っています。**現在は、凍結した平均推定器を偏差学習で使用する処理が実装済みです。** その他の`docs/`も初期設計を含むため、現在の動作は本READMEと実装コードを合わせて確認してください。
 
 本プロジェクトが対象とする手法は、Hiraharaらの「Cloud-Free Sea-Surface-Temperature Image Reconstruction From Anomaly Inpainting Network」です。論文との対応メモは[paper_notes.md](docs/paper_notes.md)にまとめています。
-
-全域の反復週平均復元と全域偏差推定は `--full-domain-time` で有効にできます。手順・論文からの実装上の解釈・出力形式は [全域復元の説明](docs/full_domain_reconstruction.md) を参照してください。

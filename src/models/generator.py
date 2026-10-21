@@ -13,9 +13,10 @@ def _assert_4d_image_tensor(x: torch.Tensor, name: str) -> tuple[int, int, int, 
     batch, channels, height, width = x.shape
     assert batch > 0, f"{name} batch dimension must be positive"
     assert channels > 0, f"{name} channel dimension must be positive"
+    assert height == width, f"{name} must be square for this baseline, got {height}x{width}"
     assert height % 8 == 0, f"{name} height must be divisible by 8, got {height}"
     assert width % 8 == 0, f"{name} width must be divisible by 8, got {width}"
-    assert min(height, width) // 8 > 16, (
+    assert height // 8 > 16, (
         f"{name} is too small for dilation=16 with reflection padding; got {height}x{width}"
     )
     return batch, channels, height, width
@@ -33,9 +34,10 @@ def _assert_volume_tensor(
     assert time_steps == expected_time_steps, (
         f"{name} must have T={expected_time_steps}, got T={time_steps}"
     )
+    assert height == width, f"{name} must be square for this baseline, got {height}x{width}"
     assert height % 8 == 0, f"{name} height must be divisible by 8, got {height}"
     assert width % 8 == 0, f"{name} width must be divisible by 8, got {width}"
-    assert min(height, width) // 8 > 16, (
+    assert height // 8 > 16, (
         f"{name} is too small for dilation=16 with reflection padding; got {height}x{width}"
     )
     return batch, channels, time_steps, height, width

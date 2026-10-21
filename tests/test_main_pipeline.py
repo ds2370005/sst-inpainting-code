@@ -153,21 +153,3 @@ def test_checkpoint_config_mismatch(tmp_path):
     runner.validate_checkpoint(checkpoint,config)
     with pytest.raises(ValueError,match='min_temp'):
         runner.validate_checkpoint(checkpoint,{'data':{'patch_size':256,'min_temp':-2}})
-
-
-def test_full_domain_dispatch_and_completion(setup):
-    tmp,config,data=setup
-    average=tmp/'avg.pth';average.write_bytes(b'fake')
-    anomaly=tmp/'ano.pth';anomaly.write_bytes(b'fake')
-    args=runner.parse_args(['--config',str(config),'--data-root',str(data),'--run-dir',str(tmp/'full'),
-        '--start-at','reconstruct','--average-checkpoint',str(average),'--anomaly-checkpoint',str(anomaly),
-        '--full-domain-time','2025-05-30T00:00:00'])
-    def execute(command,log):
-        assert command[3]=='src.infer.full_domain'
-        assert '--input' not in command
-        assert command[command.index('--target-time')+1]=='2025-05-30T00:00:00'
-        out=Path(command[command.index('--output-dir')+1]);out.mkdir()
-        (out/'run.json').write_text('{"status":"complete"}')
-        (out/'full_reconstruction.npz').write_bytes(b'fake')
-    assert runner.run(args,execute)['status']=='complete'
-    assert not (tmp/'full/outputs/preview_input.npz').exists()
