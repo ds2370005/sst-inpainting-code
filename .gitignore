@@ -25,3 +25,5 @@ logs/
 *.pt
 *.pth
 /crop_overview.png
+# Old experiment outputs
+/olds/smoke_001/
