@@ -41,6 +41,16 @@ class FTPClient:
         self.args = args
         self.ftp = None
 
+    def describe_error(self, exc):
+        """Keep server reply codes while redacting configured credentials."""
+        message = str(exc)
+        secrets = sorted((str(v) for v in (self.args.user, self.args.password) if v),
+                         key=len, reverse=True)
+        for secret in secrets:
+            message = message.replace(secret, "[REDACTED]")
+        message = " ".join(message.split())[:500]
+        return f"{type(exc).__name__}: {message}"
+
     def close(self):
         if self.ftp is not None:
             try:
@@ -73,7 +83,7 @@ class FTPClient:
                     raise
                 delay = min(self.args.retry_delay * 2 ** attempt, 60.0)
                 LOG.warning("%s: %s; retry %d/%d in %.1fs", label,
-                            type(exc).__name__, attempt + 1,
+                            self.describe_error(exc), attempt + 1,
                             self.args.retries, delay)
                 time.sleep(delay)
 
@@ -200,7 +210,7 @@ def run(args):
                 try:
                     names = client.list_files(directory, month + day)
                 except ftplib.all_errors as exc:
-                    LOG.error("[%s] Listing failed (%s)", label, type(exc).__name__)
+                    LOG.error("[%s] Listing failed (%s)", label, client.describe_error(exc))
                     failed_days += 1
                     continue
                 daily_downloaded = daily_skipped = daily_failed = 0
@@ -219,7 +229,7 @@ def run(args):
                             daily_downloaded += 1
                         except ftplib.all_errors as exc:
                             LOG.error("[%s] Failed: %s (%s)", label, name,
-                                      type(exc).__name__)
+                                      client.describe_error(exc))
                             daily_failed += 1
                         finally:
                             time.sleep(args.sleep)
