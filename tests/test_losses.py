@@ -50,16 +50,25 @@ def test_discriminator_loss_matches_bce_with_logits() -> None:
     assert torch.allclose(loss, expected)
 
 
-def test_generator_adversarial_loss_matches_bce_with_logits() -> None:
+def test_generator_adversarial_loss_matches_paper_minimax() -> None:
     fake_logits = torch.tensor([[-1.0], [0.25]], requires_grad=True)
 
     loss = generator_adversarial_loss(fake_logits)
-    expected = F.binary_cross_entropy_with_logits(
-        fake_logits,
-        torch.ones_like(fake_logits),
-    )
+    expected = torch.log1p(-torch.sigmoid(fake_logits)).mean()
     loss.backward()
 
     assert torch.allclose(loss.detach(), expected.detach())
     assert fake_logits.grad is not None
     assert torch.isfinite(fake_logits.grad).all()
+
+
+def test_minimax_extreme_logits_and_gradient_direction():
+    logits = torch.tensor([[-1000.], [0.], [1000.]], requires_grad=True)
+    loss = generator_adversarial_loss(logits)
+    loss.backward()
+    assert torch.isfinite(loss) and torch.isfinite(logits.grad).all()
+    assert (logits.grad <= 0).all()
+    assert logits.grad[-1].item() < 0
+    zero = torch.zeros(1, 1)
+    assert torch.allclose(generator_adversarial_loss(zero), -torch.log(torch.tensor(2.)))
+    assert torch.allclose(discriminator_loss(zero, zero), 2*torch.log(torch.tensor(2.)))

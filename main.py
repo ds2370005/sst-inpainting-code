@@ -28,6 +28,7 @@ def parse_args(argv=None):
     parser.add_argument('--data-root', type=Path, help='Completed unified preprocessing output')
     parser.add_argument('--himawari-input', type=Path)
     parser.add_argument('--gpv-input', type=Path)
+    parser.add_argument('--assimilation-root', type=Path, help='Prepared hourly simulation pool')
     parser.add_argument('--start-at', choices=STAGES,
                         help='Default: average if --data-root is given, otherwise preprocess')
     parser.add_argument('--stop-after', choices=STAGES, default='reconstruct')
@@ -51,7 +52,7 @@ def parse_args(argv=None):
         parser.error('--start-at must not follow --stop-after')
     args.stages = STAGES[start:stop + 1]
     for name in ('config', 'run_dir', 'data_root', 'himawari_input', 'gpv_input',
-                 'average_checkpoint', 'anomaly_checkpoint', 'inference_input'):
+                 'average_checkpoint', 'anomaly_checkpoint', 'inference_input', 'assimilation_root'):
         value = getattr(args, name)
         if value is not None:
             setattr(args, name, value.expanduser().resolve())
@@ -185,6 +186,9 @@ def run(args, executor=execute):
     total_started = time.perf_counter()
     started_at = datetime.now().astimezone().isoformat()
     config = load_config(args.config)
+    if getattr(args, "assimilation_root", None):
+        config["data"]["assimilation_mode"] = "hourly"
+        config["data"]["assimilation_root"] = str(args.assimilation_root)
     for name in ('device', 'epochs', 'batch_size', 'num_workers'):
         value = getattr(args, name)
         if value is not None:

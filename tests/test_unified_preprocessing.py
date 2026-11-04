@@ -172,3 +172,24 @@ def test_cloud_augmentation_uses_another_training_timestamp(prepared):
     np.testing.assert_array_equal(sample['random_cloud_mask'].numpy()[0],1-donor_mask)
     # The supervised target still uses the original observation mask.
     np.testing.assert_array_equal(sample['target_mask'].numpy(),sample['mask_volume'].numpy()[:,-1])
+
+
+def test_hourly_pool_is_used_instead_of_legacy_daily(prepared,tmp_path):
+    from src.preprocessing.hourly_assimilation import prepare
+    args,config,_=prepared
+    source=tmp_path/'hourly'; source.mkdir()
+    for key in ('lat','lon'): np.save(source/f'{key}.npy',np.load(args.output/f'{key}.npy'))
+    rows=[]
+    for i in range(168):
+        directory=source/str(i);directory.mkdir()
+        np.save(directory/'sst.npy',np.full((6,6),20.,np.float32))
+        rows.append(dict(path=str(i),time=(datetime(2024,8,1)+timedelta(hours=i)).isoformat()))
+    (source/'simulation.json').write_text(json.dumps(dict(units='degC',cadence_hours=1,time_basis='UTC',frames=rows)))
+    output=tmp_path/'pool';prepare(source,output,args.output,2,1)
+    config['data'].update(assimilation_mode='hourly',assimilation_root=str(output))
+    for stage,key in [('average','assimilation_weekly'),('anomaly','assimilation_sst')]:
+        sample=UnifiedSSTDataset(args.output,config,stage=stage)[0]
+        torch.testing.assert_close(sample[key],torch.full((1,2,2),2*20/35-1))
+    config['data']['assimilation_root']=None
+    with pytest.raises(ValueError,match='assimilation-root'):
+        UnifiedSSTDataset(args.output,config,stage='average')

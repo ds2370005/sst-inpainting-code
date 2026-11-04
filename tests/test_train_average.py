@@ -3,6 +3,7 @@
 from pathlib import Path
 
 import torch
+import pytest
 from torch.utils.data import DataLoader
 
 from src.train.train_average import (
@@ -65,8 +66,12 @@ def test_synthetic_average_dataset_shapes() -> None:
     assert sample["assimilation_weekly"].shape == (1, 256, 256)
 
 
-def test_train_average_one_synthetic_batch(tmp_path: Path) -> None:
+@pytest.mark.parametrize("physical", [False, True])
+def test_train_average_one_synthetic_batch(tmp_path: Path, physical) -> None:
     config = _synthetic_config(tmp_path)
+    if physical:
+        config["loss"].update(discriminator="global_local", reconstruction="masked_l2",
+                              physical_alpha=.99, physical_beta=.5)
     device = torch.device("cpu")
     loader = create_synthetic_average_loader(config, num_samples=1)
     generator, discriminator, optimizer_g, optimizer_d = build_average_training_components(

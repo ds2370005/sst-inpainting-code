@@ -20,6 +20,8 @@ from src.losses import (
     generator_adversarial_loss,
     masked_mse_loss,
 )
+from src.losses import reconstruction_loss, loss_weights
+from src.models.discriminator import build_discriminator
 from src.datasets.unified_dataset import create_training_loader
 from src.models import AverageEstimationGenerator, Discriminator
 from src.utils.config import load_config
@@ -152,7 +154,7 @@ def build_average_training_components(
     generator = AverageEstimationGenerator(
         time_steps=int(config["data"]["time_steps"]),
     ).to(device)
-    discriminator = Discriminator().to(device)
+    discriminator = build_discriminator(config["loss"]).to(device)
     optimizer_g = torch.optim.Adam(
         generator.parameters(),
         lr=float(optimizer_config["lr_generator"]),
@@ -183,8 +185,9 @@ def train_one_epoch(
 
     loss_config = config["loss"]
     epochs = int(config["training"]["epochs"])
-    lambda_rec = float(loss_config["lambda_ave_rec"])
-    lambda_adv = float(loss_config["lambda_ave_adv"])
+    lambda_rec, lambda_adv = loss_weights(loss_config, "ave")
+    beta = float(loss_config.get("physical_beta", 0.5))
+    rec_loss = lambda p, t, m: reconstruction_loss(p, t, m, loss_config)
     epoch_weight = max(0.0, 1.0 - float(epoch_index + 1) / max(float(epochs), 1.0))
     use_amp = bool(config["training"].get("mixed_precision", False)) and device.type == "cuda"
 
@@ -219,7 +222,7 @@ def train_one_epoch(
             with autocast_context():
                 real_logits = discriminator(batch["assimilation_weekly"])
                 fake_logits = discriminator(pred_weekly.detach())
-                loss_d = discriminator_loss(real_logits, fake_logits)
+                loss_d = (lambda_adv if "physical_alpha" in loss_config else 1.0) * discriminator_loss(real_logits, fake_logits, beta)
             loss_d.backward()
             optimizer_d.step()
         else:
@@ -229,16 +232,16 @@ def train_one_epoch(
             set_requires_grad(discriminator, False)
         optimizer_g.zero_grad(set_to_none=True)
         with autocast_context():
-            loss_reclong = masked_mse_loss(
+            loss_reclong = rec_loss(
                 pred_weekly,
                 monthly_average.squeeze(2),
                 monthly_mask.squeeze(2),
             )
-            loss_recshort = masked_mse_loss(pred_weekly, weekly_average, weekly_mask)
+            loss_recshort = rec_loss(pred_weekly, weekly_average, weekly_mask)
             loss_rec = epoch_weight * loss_reclong + loss_recshort
             if use_adversarial:
                 fake_logits_for_g = discriminator(pred_weekly)
-                loss_adv = generator_adversarial_loss(fake_logits_for_g)
+                loss_adv = generator_adversarial_loss(fake_logits_for_g, beta)
             else:
                 loss_adv = pred_weekly.new_zeros(())
             loss_g = lambda_rec * loss_rec + lambda_adv * loss_adv
@@ -280,6 +283,7 @@ def save_checkpoint(
             "epoch": epoch,
             "generator_state_dict": generator.state_dict(),
             "discriminator_state_dict": discriminator.state_dict(),
+            "adversarial_objective": "physical_model_minimax_global_local" if config["loss"].get("discriminator") == "global_local" else "hirahara_eq2_minimax",
             "optimizer_g_state_dict": optimizer_g.state_dict(),
             "optimizer_d_state_dict": optimizer_d.state_dict(),
             "config": dict(config),
@@ -361,7 +365,7 @@ def main() -> None:  # 学習処理: 実データまたはsyntheticで平均推�
             print(f"Sample selection: {loader.dataset.selection_counts}")
         print(
             f"Loaded {len(loader.dataset)} samples from {args.data_root}. "
-            + ("GPV adversarial inputs are enabled." if hasattr(loader.dataset, "pool")
+            + ("Data-assimilation adversarial inputs are enabled." if hasattr(loader.dataset, "pool")
              else "Data-assimilation fields are absent, so adversarial loss is disabled.")
         )
     generator, discriminator, optimizer_g, optimizer_d = build_average_training_components(

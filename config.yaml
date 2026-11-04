@@ -9,6 +9,8 @@ data:
   min_temp: 0.0
   max_temp: 35.0
   anomaly_range: 5.0
+  assimilation_mode: hourly
+  assimilation_root: null  # Set --assimilation-root to the prepared hourly simulation pool
   sample_transforms: []  # Optional module:ClassName hooks in the unified loader
 
 training:
@@ -25,6 +27,10 @@ optimizer:
   beta2: 0.99
 
 loss:
+  discriminator: global_local
+  reconstruction: masked_l2
+  physical_beta: 0.5  # ACPR full-version experiment
+  physical_alpha: 0.99  # Tunable adaptation; not specified numerically in the paper
   lambda_ave_rec: 10.0
   lambda_ave_adv: 0.1
   lambda_ano_rec: 10.0

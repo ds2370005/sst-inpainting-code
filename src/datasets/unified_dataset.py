@@ -49,7 +49,30 @@ class UnifiedSSTDataset(Dataset):
         self.cloud_donor_index = {path:i for i,(path,_) in enumerate(self.cloud_donors)}
         if stage == 'anomaly' and len(self.cloud_donors) < 2:
             raise ValueError('Anomaly augmentation needs at least two distinct training images')
-        self.pool=manifest['gpv_pools']['weekly' if stage=='average' else 'daily']
+        self.physical_root = self.root
+        mode = config['data'].get('assimilation_mode', 'legacy_gpv')
+        if mode == 'hourly':
+            location = config['data'].get('assimilation_root')
+            if not location:
+                raise ValueError('Hourly simulation training requires --assimilation-root (prepared physical pool)')
+            self.physical_root = Path(location)
+            state = json.loads((self.physical_root/'run.json').read_text())
+            physical = json.loads((self.physical_root/'physical_pool.json').read_text())
+            if state.get('status') != 'complete': raise ValueError('Hourly preprocessing incomplete')
+            for key, expected in [('format_version',1), ('units','degC'), ('cadence_hours',1),
+                                  ('time_basis','UTC'), ('patch_size',self.settings['patch_size']),
+                                  ('weekly_aggregation','168_consecutive_hourly_frames')]:
+                if physical.get(key) != expected: raise ValueError(f'Invalid physical pool: {key}')
+            for key in ('lat','lon'):
+                a=np.load(self.root/f'{key}.npy',allow_pickle=False)
+                b=np.load(self.physical_root/f'{key}.npy',allow_pickle=False)
+                if a.shape != b.shape or not np.allclose(a,b,rtol=0,atol=1e-6):
+                    raise ValueError(f'Physical/satellite grid mismatch: {key}')
+            self.pool=physical['pools']['weekly' if stage=='average' else 'hourly']
+        elif mode == 'legacy_gpv':
+            self.pool=manifest['gpv_pools']['weekly' if stage=='average' else 'daily']
+        else:
+            raise ValueError(f'Unknown assimilation_mode: {mode}')
         if not self.samples or not self.pool:raise ValueError('No eligible satellite samples or GPV pool; inspect dataset.json')
         self.transforms=tuple(transforms)
         self.seed=int(config.get('seed',42))
@@ -83,7 +106,9 @@ class UnifiedSSTDataset(Dataset):
         # Fixed, reproducible independent sampling; no satellite/GPV time-location pairing.
         rng=np.random.default_rng(np.random.SeedSequence([self.seed,index]))
         physical=self.pool[int(rng.integers(len(self.pool)))]
-        values=self.crop(physical['path'],'sst',physical['origin'])
+        y,x=physical['origin']
+        values=np.array(read_array(self.physical_root,physical['path'])[y:y+self.size,x:x+self.size],copy=True)
+        if values.shape != (self.size,self.size): raise ValueError('Physical patch outside grid')
         if not np.isfinite(values).all():raise ValueError('GPV index contains missing pixels; regenerate index')
         key='assimilation_weekly' if self.stage=='average' else 'assimilation_sst'
         sample[key]=self.normalize(values[None])[0]
@@ -124,5 +149,7 @@ def create_training_loader(root,config,*,stage,shuffle=True):
         return create_unified_loader(root,config,stage=stage,shuffle=shuffle)
     if (Path(root)/'run.json').exists():
         raise ValueError('Unified preprocessing is incomplete; dataset.json is missing')
+    if config['data'].get('assimilation_mode') == 'hourly':
+        raise ValueError('Hourly simulation mode requires a unified satellite dataset.json')
     from olds.datasets.himawari_patch_dataset import create_himawari_loader
     return create_himawari_loader(root,config,stage=stage,shuffle=shuffle)
