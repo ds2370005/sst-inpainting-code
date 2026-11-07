@@ -2,6 +2,7 @@
 from pathlib import Path
 from datetime import datetime, timedelta
 import argparse
+import re
 import numpy as np
 from netCDF4 import Dataset, num2date
 from .common import save_frame, write_json
@@ -26,11 +27,21 @@ def align(input_root, satellite_root, output, start=None, end=None, max_frames=N
             raise ValueError('ひまわり座標は有限・単調な1次元配列が必要です')
     files=sorted(input_root.rglob('TT_*.nc'))
     if not files: raise ValueError('TT_*.ncが見つかりません')
-    # 先に時間座標を確認。重複は拒否し、日付ではなく実際の時刻で選別する。
+    # 日別ファイルの名前で候補を絞り、選択したファイルの実時刻も検証する。
     selected=[]
     seen=set()
     for path in files:
-        with Dataset(path) as ds:
+        match=re.fullmatch(r'TT_(\d{8})\.nc', path.name)
+        if match is None:
+            raise ValueError(f'未対応のファイル名（TT_YYYYMMDD.ncが必要）: {path}')
+        file_day=datetime.strptime(match[1], '%Y%m%d')
+        if (start and file_day+timedelta(days=1)<=start) or (end and file_day>=end):
+            continue
+        try:
+            dataset=Dataset(path)
+        except OSError as exc:
+            raise OSError(f'対象期間のNetCDFを開けません: {path}。ファイルの完全性・アクセス環境を確認してください。元のエラー: {exc}') from exc
+        with dataset as ds:
             time=ds.variables['time']
             if getattr(time,'calendar','standard') not in ('standard','gregorian','proleptic_gregorian'):
                 raise ValueError(f'未対応のカレンダー: {path}')
@@ -39,6 +50,8 @@ def align(input_root, satellite_root, output, start=None, end=None, max_frames=N
             dates=num2date(raw, time.units, calendar=getattr(time,'calendar','standard'))
             for index,d in enumerate(dates):
                 stamp=datetime(d.year,d.month,d.day,d.hour,d.minute,d.second,d.microsecond)
+                if stamp.date() != file_day.date():
+                    raise ValueError(f'ファイル名の日付と内部時刻が不一致: {path}: {stamp}')
                 if stamp.minute or stamp.second or stamp.microsecond:
                     raise ValueError(f'正時ではない時刻: {path}: {stamp}')
                 if (start and stamp<start) or (end and stamp>=end): continue

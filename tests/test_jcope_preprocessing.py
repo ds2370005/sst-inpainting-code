@@ -43,3 +43,24 @@ def test_duplicate_time_rejected(tmp_path):
     raw,grid=fixture_files(tmp_path)
     with Dataset(raw/'TT_20240801.nc','a') as d:d.variables['time'][:]=[0,0]
     with pytest.raises(ValueError,match='重複'):align(raw,grid,tmp_path/'out')
+
+
+def test_unreadable_file_outside_period_is_not_opened(tmp_path):
+    raw,grid=fixture_files(tmp_path)
+    (raw/'TT_20250112.nc').write_bytes(b'broken file')
+    result=align(raw,grid,tmp_path/'out','2024-08-01','2024-08-01',2)
+    assert len(result['frames'])==2
+
+
+def test_unreadable_file_in_period_is_reported(tmp_path):
+    raw,grid=fixture_files(tmp_path)
+    (raw/'TT_20250112.nc').write_bytes(b'broken file')
+    with pytest.raises(OSError,match='対象期間のNetCDF.*TT_20250112'):
+        align(raw,grid,tmp_path/'out','2025-01-12','2025-01-12')
+
+
+def test_filename_date_must_match_time(tmp_path):
+    raw,grid=fixture_files(tmp_path)
+    (raw/'TT_20240801.nc').rename(raw/'TT_20240802.nc')
+    with pytest.raises(ValueError,match='日付と内部時刻が不一致'):
+        align(raw,grid,tmp_path/'out')
