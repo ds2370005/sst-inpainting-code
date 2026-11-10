@@ -64,3 +64,18 @@ def test_filename_date_must_match_time(tmp_path):
     (raw/'TT_20240801.nc').rename(raw/'TT_20240802.nc')
     with pytest.raises(ValueError,match='日付と内部時刻が不一致'):
         align(raw,grid,tmp_path/'out')
+
+
+def test_download_check_complete_and_missing(tmp_path):
+    from check_jcope_download import check
+    raw,grid=fixture_files(tmp_path)
+    # fixture has only two hours: time-count issue, plus a missing next day.
+    result=check(raw,'2024-08-01','2024-08-02',tmp_path/'report',True)
+    assert len(result['issues'])==2
+    with Dataset(raw/'TT_20240802.nc','w') as d:
+        for name,size in [('time',24),('depth',1),('lat',2),('lon',2)]:d.createDimension(name,size)
+        z=d.createVariable('depth','f4',('depth',));z[:]=[0]
+        t=d.createVariable('time','f4',('time',));t.units='hours since 2024-08-02';t[:]=np.arange(24)
+        v=d.createVariable('TT','f4',('time','depth','lat','lon'));v[:]=20
+    result=check(raw,'2024-08-02','2024-08-02',tmp_path/'report2',True)
+    assert result['passed']==1 and not result['issues']

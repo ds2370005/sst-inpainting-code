@@ -10,13 +10,14 @@ from .sampling import build_indices
 
 def run(args):
     # Fail before expensive satellite conversion if the GRIB runtime is missing.
-    import eccodes  # noqa: F401
+    if args.gpv_input is not None:
+        import eccodes  # noqa: F401
     config=load_config(args.config)
     settings=dict(config['data'], seed=int(config.get('seed',42)), patches_per_frame=args.patches_per_frame,
                   weekly_min_observations=3,monthly_min_observations=5,
                   bounds=list(args.bounds),min_quality=args.min_quality,
                   cloud_policy='quality_screened_missing_ocean',crop_policy='random_full_ocean',
-                  gpv_policy='FD01_depth1m_daily_forecast',gpv_interpolation='bilinear')
+                  gpv_policy='FD01_depth1m_daily_forecast' if args.gpv_input else 'unused',gpv_interpolation='bilinear' if args.gpv_input else None)
     if settings.get('satellite','himawari')!='himawari':
         raise ValueError('Only Himawari is supported')
     for key in ('patch_size','time_steps','time_interval_hours','patches_per_frame'):
@@ -30,15 +31,20 @@ def run(args):
     write_json(args.output/'run.json',dict(status='running',settings=settings))
     try:
         frames,grid=Himawari_preprocessing.preprocess(args.himawari_input,args.output,args.bounds,args.min_quality,args.max_frames)
-        gpv=GPV_preprocessing.preprocess(args.gpv_input,args.output,grid,args.max_archives)
+        gpv=(GPV_preprocessing.preprocess(args.gpv_input,args.output,grid,args.max_archives)
+             if args.gpv_input else dict(daily=[],weekly=[],missing_days=[]))
         index=build_indices(args.output,frames,gpv,settings)
         result=dict(format_version=FORMAT_VERSION,settings=settings,himawari_frames=frames,gpv=gpv,**index)
         write_json(args.output/'dataset.json',result)
         ready=bool(index['samples'] and all(index['gpv_pools'].values()))
+        satellite_ready=bool(index['samples'])
         write_json(args.output/'run.json',dict(status='complete',training_ready=ready,
+                    satellite_ready=satellite_ready,requires_external_assimilation=args.gpv_input is None,
                     samples=len(index['samples']),gpv_daily=len(index['gpv_pools']['daily']),gpv_weekly=len(index['gpv_pools']['weekly']),settings=settings))
         print(f"Preprocessing complete. training_ready={ready}; {args.output / 'dataset.json'}")
-        if not ready:print('Insufficient histories or valid crops. Inspect run.json and dataset.json; training will reject empty pools.')
+        if args.gpv_input is None:
+            print(f'Himawari satellite_ready={satellite_ready}; 学習には別途JCOPEプールを指定してください。')
+        elif not ready:print('Insufficient histories or valid crops. Inspect run.json and dataset.json; training will reject empty pools.')
         return result
     except BaseException as exc:
         write_json(args.output/'run.json',dict(status='failed',error=str(exc),settings=settings))
@@ -48,7 +54,7 @@ def run(args):
 def main():
     p=argparse.ArgumentParser(description=__doc__)
     p.add_argument('--himawari-input',type=Path,required=True)
-    p.add_argument('--gpv-input',type=Path,required=True)
+    p.add_argument('--gpv-input',type=Path,help='旧GPV用。省略するとひまわりだけを前処理')
     p.add_argument('--output',type=Path,required=True)
     p.add_argument('--config',default='config.yaml')
     p.add_argument('--bounds',type=float,nargs=4,default=[17,50,117,150],metavar=('SOUTH','NORTH','WEST','EAST'))

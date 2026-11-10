@@ -193,3 +193,15 @@ def test_hourly_pool_is_used_instead_of_legacy_daily(prepared,tmp_path):
     config['data']['assimilation_root']=None
     with pytest.raises(ValueError,match='assimilation-root'):
         UnifiedSSTDataset(args.output,config,stage='average')
+
+
+def test_satellite_only_pipeline(prepared,tmp_path,monkeypatch):
+    args,config,_=prepared
+    args.gpv_input=None;args.output=tmp_path/'satellite_only'
+    def forbidden(*a,**k):raise AssertionError('GPV must not run')
+    monkeypatch.setattr(gpv,'preprocess',forbidden)
+    manifest=run(args)
+    assert manifest['samples'] and manifest['gpv_pools']==dict(daily=[],weekly=[])
+    status=json.loads((args.output/'run.json').read_text())
+    assert status['status']=='complete' and status['satellite_ready']
+    assert status['requires_external_assimilation']
