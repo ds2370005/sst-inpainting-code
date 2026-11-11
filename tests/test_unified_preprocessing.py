@@ -205,3 +205,24 @@ def test_satellite_only_pipeline(prepared,tmp_path,monkeypatch):
     status=json.loads((args.output/'run.json').read_text())
     assert status['status']=='complete' and status['satellite_ready']
     assert status['requires_external_assimilation']
+
+
+def test_training_month_filter_preserves_history(prepared):
+    args,config,manifest=prepared
+    path=args.output/'dataset.json'
+    original=manifest['samples']
+    extra=dict(original[0],time='2025-05-01T00:00:00')
+    manifest['samples']=original+[extra];path.write_text(json.dumps(manifest))
+    config['data']['training_months']=['2025-04']
+    for stage in ('average','anomaly'):
+        ds=UnifiedSSTDataset(args.output,config,stage=stage)
+        assert len(ds)==len(original)
+        assert ds.samples[0]['history']==original[0]['history']
+        assert ds.selection_counts['excluded_by_month']==1
+        assert ds[0]['sst_volume'].shape==(1,9,2,2)
+    config['data']['training_months']=['2026-04']
+    with pytest.raises(ValueError,match='No satellite samples'):
+        UnifiedSSTDataset(args.output,config,stage='average')
+    config['data']['training_months']='2025-04'
+    with pytest.raises(ValueError,match='training_months'):
+        UnifiedSSTDataset(args.output,config,stage='average')

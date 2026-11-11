@@ -2,6 +2,8 @@
 from pathlib import Path
 import importlib
 import json
+import re
+from collections import Counter
 import numpy as np
 import torch
 from torch.utils.data import Dataset,DataLoader
@@ -39,7 +41,22 @@ class UnifiedSSTDataset(Dataset):
             if config['data'].get(key)!=self.settings.get(key):
                 raise ValueError(f'Training/preprocessing setting differs: {key}')
         self.samples=manifest['samples']
-        self.selection_counts=manifest['selection_counts']
+        self.selection_counts=dict(manifest['selection_counts'])
+        months=config['data'].get('training_months')
+        if months is not None:
+            if not isinstance(months,list) or not months or any(
+                not isinstance(m,str) or re.fullmatch(r'\d{4}-(0[1-9]|1[0-2])',m) is None for m in months
+            ):
+                raise ValueError('data.training_months must be a nonempty list of YYYY-MM strings')
+            before=len(self.samples)
+            self.samples=[row for row in self.samples if row['time'][:7] in months]
+            if not self.samples:
+                raise ValueError('No satellite samples in data.training_months')
+            self.selection_counts.update(accepted_before_month_filter=before,
+                                         excluded_by_month=before-len(self.samples),accepted=len(self.samples))
+            print('Satellite target months:',sorted(set(months)),flush=True)
+            print('Satellite samples per month:',dict(sorted(Counter(r['time'][:7] for r in self.samples).items())),flush=True)
+        # 月の選択は対象時刻だけ。入力履歴・月平均のための過去フレームは維持する。
         # One eligible crop per source timestamp; never use the target image as donor.
         donors = {}
         for row in self.samples:
