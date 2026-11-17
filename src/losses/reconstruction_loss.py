@@ -28,7 +28,7 @@ def masked_mse_loss(
 
 
 def masked_l2_loss(pred, target, mask):
-    """ACPR Eq. (6): mean of per-image L2 norms, NOT pixel MSE/RMSE."""
+    """Hirahara Eqs. (3),(4),(7): batch mean of masked image L2 norms."""
     if pred.ndim != 4 or pred.shape != target.shape or pred.shape != mask.shape:
         raise ValueError("pred, target, mask must have identical [B,C,H,W] shapes")
     valid = mask > 0
@@ -47,7 +47,7 @@ def reconstruction_loss(pred, target, mask, config):
 
 
 def loss_weights(config, stage):
-    """Eq. (9); retain explicit legacy lambda settings for old configurations."""
+    """Hirahara lambda weights; retain alpha for earlier ACPR experiments."""
     if "physical_alpha" in config:
         alpha = float(config["physical_alpha"])
         if not 0 < alpha < 1:

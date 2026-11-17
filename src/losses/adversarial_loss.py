@@ -1,4 +1,7 @@
-"""ACPR Eqs. (3)-(5): global/local adversarial physical model loss.
+"""Hirahara Eq. (2): adversarial physical model loss.
+
+Tensor logits use the paper's single global discriminator. Dictionary logits
+retain the optional global/local experiment for older configurations only.
 
 D minimizes -log D(real) - log(1-D(fake)); G minimizes log(1-D(fake)).
 The real term is constant with respect to G and omitted from its update.

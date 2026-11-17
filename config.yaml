@@ -28,10 +28,9 @@ optimizer:
   beta2: 0.99
 
 loss:
-  discriminator: global_local
+  discriminator: global  # 平原論文の表III：画像全体を1値で識別
   reconstruction: masked_l2
-  physical_beta: 0.5  # ACPR full-version experiment
-  physical_alpha: 0.99  # Tunable adaptation; not specified numerically in the paper
+  # 平原論文の式(6),(10)：alphaによる重み付けは使用しない
   lambda_ave_rec: 10.0
   lambda_ave_adv: 0.1
   lambda_ano_rec: 10.0

@@ -1,6 +1,6 @@
 """Table III discriminator: six stride-2 layers, then a 4x4 scalar head.
 
-Returns logits. BCEWithLogits applies the paper's final sigmoid stably.
+Returns logits. The loss applies log-sigmoid stably.
 The paper's training patch size is 256x256; other sizes are rejected.
 """
 import torch
