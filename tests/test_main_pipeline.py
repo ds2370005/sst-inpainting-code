@@ -153,3 +153,24 @@ def test_checkpoint_config_mismatch(tmp_path):
     runner.validate_checkpoint(checkpoint,config)
     with pytest.raises(ValueError,match='min_temp'):
         runner.validate_checkpoint(checkpoint,{'data':{'patch_size':256,'min_temp':-2}})
+
+
+def test_full_domain_skips_average_and_runs_full_inference(setup):
+    tmp,config,data=setup
+    cfg=yaml.safe_load(config.read_text())
+    cfg['data'].update(baseline_method='temporal_mean_nearest',baseline_scope='full_domain')
+    config.write_text(yaml.safe_dump(cfg))
+    args=runner.parse_args(['--config',str(config),'--data-root',str(data),'--run-dir',str(tmp/'full'), '--target-time','2025-04-30T00:00:00'])
+    calls=[]
+    def execute(command,log):
+        calls.append(command[3])
+        assert '--average-checkpoint' not in command
+        if command[3]=='src.train.train_anomaly':
+            out=tmp/'full/checkpoints/anomaly';out.mkdir(parents=True)
+            (out/'latest.pth').write_text('fake checkpoint')
+        else:
+            out=Path(command[command.index('--output')+1]);out.mkdir(parents=True)
+            np.save(out/'reconstructed_sst.npy',np.zeros((3,3)))
+            (out/'metadata.json').write_text('{}')
+    assert runner.run(args,execute)['status']=='complete'
+    assert calls==['src.train.train_anomaly','src.infer.full_domain']

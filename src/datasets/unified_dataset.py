@@ -37,6 +37,8 @@ class UnifiedSSTDataset(Dataset):
         manifest=json.loads((self.root/'dataset.json').read_text())
         if manifest['format_version']!=FORMAT_VERSION:raise ValueError('Unsupported dataset format')
         self.settings=manifest['settings']
+        self.natural_masks = config["data"].get("baseline_method") == "temporal_mean_nearest"
+        self.full_baseline = config["data"].get("baseline_method") == "temporal_mean_nearest" and config["data"].get("baseline_scope", "patch") == "full_domain"
         for key in ('patch_size','time_steps','time_interval_hours','min_temp','max_temp','satellite','max_cloud_fraction'):
             if config['data'].get(key)!=self.settings.get(key):
                 raise ValueError(f'Training/preprocessing setting differs: {key}')
@@ -64,7 +66,7 @@ class UnifiedSSTDataset(Dataset):
                 donors.setdefault(path, row['origin'])
         self.cloud_donors = list(donors.items())
         self.cloud_donor_index = {path:i for i,(path,_) in enumerate(self.cloud_donors)}
-        if stage == 'anomaly' and len(self.cloud_donors) < 2:
+        if stage == 'anomaly' and not self.natural_masks and len(self.cloud_donors) < 2:
             raise ValueError('Anomaly augmentation needs at least two distinct training images')
         self.physical_root = self.root
         mode = config['data'].get('assimilation_mode', 'legacy_gpv')
@@ -131,7 +133,7 @@ class UnifiedSSTDataset(Dataset):
         sample[key]=self.normalize(values[None])[0]
         cloud=self.crop(row['frames'][-1],'cloud_mask',origin)
         sample['cloud_mask']=torch.from_numpy(cloud[None].astype(np.float32))
-        if self.stage == 'anomaly':
+        if self.stage == 'anomaly' and not self.natural_masks:
             own = self.cloud_donor_index[row['frames'][-1]]
             donor = int(torch.randint(len(self.cloud_donors)-1, ()).item())
             donor += donor >= own
@@ -140,6 +142,15 @@ class UnifiedSSTDataset(Dataset):
             if not np.isin(donor_cloud, [0,1]).all():
                 raise ValueError('Donor cloud mask must be binary (1=cloud)')
             sample['random_cloud_mask'] = torch.from_numpy((1-donor_cloud)[None].astype(np.float32))
+        if self.full_baseline and self.stage == 'anomaly':
+            from src.preprocessing.full_domain_input import load_full_frames
+            from src.models.temporal_baseline import temporal_mean_nearest
+            # 各時刻の実際の観測欠損のみを使用。追加の共通雲マスクは掛けない。
+            full_sst, full_mask, ocean = load_full_frames(self.root, row['frames'], self.settings)
+            result = temporal_mean_nearest(full_sst, full_mask, ocean)
+            y,x=origin
+            region=(slice(y,y+self.size),slice(x,x+self.size))
+            sample['temporal_baseline'] = result['baseline'][0,:,region[0],region[1]].clone()
         # Metadata is provided to hooks; only tensor dict is returned for existing training loops.
         context=dict(target_time=row['time'],origin=origin,
                      lat=self.lat[origin[0]:origin[0]+self.size],lon=self.lon[origin[1]:origin[1]+self.size],

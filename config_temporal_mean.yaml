@@ -2,6 +2,7 @@ seed: 42
 
 data:
   baseline_method: temporal_mean_nearest
+  baseline_scope: full_domain
   patch_size: 256
   time_steps: 9
   time_interval_hours: 6

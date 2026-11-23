@@ -45,3 +45,15 @@ def test_nearest_inference_uses_no_average_checkpoint(tmp_path, monkeypatch):
     out=module.run_reconstruction(config=config,average_checkpoint=None,anomaly_checkpoint='unused',input_path=path,output_path=tmp_path/'out.npz',device=torch.device('cpu'))
     np.testing.assert_allclose(out['pred_sst'],.2)
     assert (out['observation_count']==9).all()
+
+
+def test_time_varying_clouds_are_combined_without_common_mask():
+    s=torch.zeros(1,1,9,2,2)
+    m=torch.zeros_like(s)
+    s[0,0,0,0,0]=10; m[0,0,0,0,0]=1
+    s[0,0,1,0,1]=20; m[0,0,1,0,1]=1
+    s[0,0,2,1,0]=30; m[0,0,2,1,0]=1
+    result=temporal_mean_nearest(s,m)
+    assert result['interpolated_mask'].sum()==1
+    torch.testing.assert_close(result['baseline'][0,0,0],torch.tensor([10.,20.]))
+    assert result['baseline'][0,0,1,0]==30

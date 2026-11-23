@@ -35,6 +35,7 @@ def parse_args(argv=None):
     parser.add_argument('--average-checkpoint', type=Path)
     parser.add_argument('--anomaly-checkpoint', type=Path)
     parser.add_argument('--inference-input', type=Path, help='Optional normalized inference NPZ')
+    parser.add_argument('--target-time', help='UTC target for full-domain temporal reconstruction')
     parser.add_argument('--sample-index', type=int, default=0,
                         help='Without --inference-input, reconstruct this training sample as a preview')
     parser.add_argument('--device')
@@ -205,7 +206,13 @@ def run(args, executor=execute):
             validate_checkpoint(path, config)
     if args.inference_input:
         validate_input(args.inference_input, config)
-    preview = 'reconstruct' in args.stages and not args.inference_input
+    full_domain = nearest and config['data'].get('baseline_scope') == 'full_domain'
+    if full_domain and 'reconstruct' in args.stages:
+        if not getattr(args, 'target_time', None) or args.data_root is None:
+            raise ValueError('Full-domain reconstruction requires --target-time and --data-root')
+        if args.inference_input:
+            raise ValueError('Full-domain reconstruction reads full frames, not preview NPZ')
+    preview = 'reconstruct' in args.stages and not args.inference_input and not full_domain
     if preview and config['data'].get('sample_transforms'):
         raise ValueError('Automatic preview does not support feature transforms; supply --inference-input or stop after anomaly')
     if args.data_root:
@@ -252,6 +259,11 @@ def run(args, executor=execute):
                     command += ['--average-checkpoint', str(average)]
                 if args.smoke:
                     command += ['--max-batches', '1']
+            elif full_domain:
+                validate_checkpoint(anomaly, config)
+                command = prefix + ['src.infer.full_domain', '--config', str(config_path),
+                    '--data-root', str(data_root), '--target-time', args.target_time,
+                    '--anomaly-checkpoint', str(anomaly), '--output', str(args.run_dir / 'outputs/full_domain')]
             else:
                 if not nearest:
                     validate_checkpoint(average, config)
@@ -278,6 +290,9 @@ def run(args, executor=execute):
                 if status.get('status') != 'complete':
                     raise ValueError('Preprocessing did not finish successfully')
                 validate_data(data_root, config, args.stages, preview)
+            elif full_domain:
+                require_file(args.run_dir / 'outputs/full_domain/reconstructed_sst.npy')
+                require_file(args.run_dir / 'outputs/full_domain/metadata.json')
             else:
                 import numpy as np
                 require_file(destination / 'reconstruction.npz')

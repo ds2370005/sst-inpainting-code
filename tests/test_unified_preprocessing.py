@@ -226,3 +226,14 @@ def test_training_month_filter_preserves_history(prepared):
     config['data']['training_months']='2025-04'
     with pytest.raises(ValueError,match='training_months'):
         UnifiedSSTDataset(args.output,config,stage='average')
+
+
+def test_full_domain_baseline_is_cropped_after_interpolation(prepared):
+    args,config,_=prepared
+    config['data'].update(baseline_method='temporal_mean_nearest',baseline_scope='full_domain')
+    ds=UnifiedSSTDataset(args.output,config,stage='anomaly')
+    sample=ds[0]
+    assert sample['temporal_baseline'].shape==sample['target_sst'].shape
+    assert torch.isfinite(sample['temporal_baseline']).all()
+    assert "random_cloud_mask" not in sample
+    assert sample["sst_volume"].shape == sample["mask_volume"].shape

@@ -83,6 +83,8 @@ def run_reconstruction(
     output_path: str | Path,
     device: torch.device,
 ) -> dict[str, np.ndarray]:  # 推論処理: 平均推定と異常補完を順に通してSSTを再構成する
+    if config["data"].get("baseline_scope") == "full_domain":
+        raise ValueError("Use src.infer.full_domain for full-domain baseline inference")
     inputs = {
         key: value.to(device)
         for key, value in load_reconstruction_input(input_path).items()

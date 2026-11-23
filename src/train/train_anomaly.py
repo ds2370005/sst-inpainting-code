@@ -241,9 +241,18 @@ def train_one_epoch(
             break
 
         batch = move_batch_to_device(raw_batch, device)
-        masked_sst, masked_valid = apply_random_cloud_mask(batch)
         if data_config.get("baseline_method", "learned") == "temporal_mean_nearest":
-            weekly_average = temporal_mean_nearest(masked_sst, masked_valid)["baseline"]
+            # 9時刻それぞれの観測マスクを保持し、追加遮蔽しない。
+            masked_sst, masked_valid = batch["sst_volume"], batch["mask_volume"]
+        else:
+            masked_sst, masked_valid = apply_random_cloud_mask(batch)
+        if data_config.get("baseline_method", "learned") == "temporal_mean_nearest":
+            if data_config.get("baseline_scope", "patch") == "full_domain":
+                if "temporal_baseline" not in batch:
+                    raise ValueError("Full-domain baseline must be supplied by unified loader")
+                weekly_average = batch["temporal_baseline"]
+            else:
+                weekly_average = temporal_mean_nearest(masked_sst, masked_valid)["baseline"]
         elif average_generator is None:
             # Retained for isolated synthetic tests; real CLI requires stage one.
             weekly_average = batch["weekly_average"]
