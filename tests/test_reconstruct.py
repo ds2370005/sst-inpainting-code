@@ -87,6 +87,7 @@ def test_reconstruction_converts_anomaly_units(tmp_path, monkeypatch):
     monkeypatch.setattr(module, "AverageEstimationGenerator", lambda **kw: Constant(0.0))
     monkeypatch.setattr(module, "AnomalyInpaintingGenerator", lambda **kw: Constant(1.0))
     monkeypatch.setattr(module, "load_generator_checkpoint", lambda *args: None)
+    monkeypatch.setattr(module.torch, "load", lambda *args, **kwargs: {})
     path = tmp_path / "input.npz"
     np.savez(path, sst_volume=np.zeros((1, 9, 2, 2)),
              mask_volume=np.ones((1, 9, 2, 2)),

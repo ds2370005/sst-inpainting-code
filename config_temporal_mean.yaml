@@ -1,0 +1,43 @@
+seed: 42
+
+data:
+  baseline_method: temporal_mean_nearest
+  patch_size: 256
+  time_steps: 9
+  time_interval_hours: 6
+  satellite: himawari
+  max_cloud_fraction: 0.5  
+  min_temp: 0.0
+  max_temp: 35.0
+  anomaly_range: 5.0
+  assimilation_mode: hourly
+  assimilation_root: null  # Set --assimilation-root to the prepared hourly simulation pool
+  training_months: ["2025-04", "2025-05", "2025-06", "2026-04", "2026-05", "2026-06"]
+  sample_transforms: []  # Optional module:ClassName hooks in the unified loader
+
+training:
+  epochs: 30
+  batch_size: 32
+  num_workers: 4
+  device: cuda
+  mixed_precision: false
+
+optimizer:
+  lr_generator: 1.0e-4
+  lr_discriminator: 1.0e-8
+  beta1: 0.5
+  beta2: 0.99
+
+loss:
+  discriminator: global  # 平原論文の表III：画像全体を1値で識別
+  reconstruction: masked_l2
+  # 平原論文の式(6),(10)：alphaによる重み付けは使用しない
+  lambda_ave_rec: 10.0
+  lambda_ave_adv: 0.1
+  lambda_ano_rec: 10.0
+  lambda_ano_adv: 0.1
+
+paths:
+  checkpoint_dir: checkpoints
+  output_dir: outputs
+

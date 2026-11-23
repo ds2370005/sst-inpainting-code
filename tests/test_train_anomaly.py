@@ -67,10 +67,13 @@ def test_synthetic_anomaly_dataset_shapes() -> None:
     assert sample["assimilation_sst"].shape == (1, 256, 256)
 
 
-@pytest.mark.parametrize("physical", [False, True, "hirahara"])
+@pytest.mark.parametrize("physical", [False, True, "hirahara", "nearest"])
 def test_train_anomaly_one_synthetic_batch(tmp_path: Path, physical) -> None:
     config = _synthetic_config(tmp_path)
-    if physical == "hirahara":
+    if physical == "nearest":
+        config["data"]["baseline_method"] = "temporal_mean_nearest"
+        config["loss"].update(discriminator="global", reconstruction="masked_l2")
+    elif physical == "hirahara":
         config["loss"].update(discriminator="global", reconstruction="masked_l2")
     elif physical:
         config["loss"].update(discriminator="global_local", reconstruction="masked_l2",

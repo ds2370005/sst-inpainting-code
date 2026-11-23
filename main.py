@@ -73,7 +73,7 @@ def parse_args(argv=None):
         parser.error('--average-checkpoint is for skipping average training, not resuming it')
     if 'anomaly' in args.stages and args.anomaly_checkpoint:
         parser.error('--anomaly-checkpoint is for skipping anomaly training, not resuming it')
-    if start >= STAGES.index('anomaly') and not args.average_checkpoint:
+    if start >= STAGES.index('anomaly') and not args.average_checkpoint and load_config(args.config)['data'].get('baseline_method', 'learned') != 'temporal_mean_nearest':
         parser.error('Starting here requires --average-checkpoint')
     if args.start_at == 'reconstruct' and not args.anomaly_checkpoint:
         parser.error('Reconstruction requires --anomaly-checkpoint')
@@ -186,6 +186,9 @@ def run(args, executor=execute):
     total_started = time.perf_counter()
     started_at = datetime.now().astimezone().isoformat()
     config = load_config(args.config)
+    nearest = config["data"].get("baseline_method", "learned") == "temporal_mean_nearest"
+    if nearest:
+        args.stages = [stage for stage in args.stages if stage != "average"]
     if getattr(args, "assimilation_root", None):
         config["data"]["assimilation_mode"] = "hourly"
         config["data"]["assimilation_root"] = str(args.assimilation_root)
@@ -244,13 +247,14 @@ def run(args, executor=execute):
             elif stage in ('average', 'anomaly'):
                 validate_data(data_root, config, [stage], False)
                 command = prefix + [f'src.train.train_{stage}', '--config', str(config_path), '--data-root', str(data_root)]
-                if stage == 'anomaly':
+                if stage == 'anomaly' and not nearest:
                     validate_checkpoint(average, config)
                     command += ['--average-checkpoint', str(average)]
                 if args.smoke:
                     command += ['--max-batches', '1']
             else:
-                validate_checkpoint(average, config)
+                if not nearest:
+                    validate_checkpoint(average, config)
                 validate_checkpoint(anomaly, config)
                 destination = args.run_dir / 'outputs'
                 destination.mkdir(exist_ok=True)
@@ -260,8 +264,10 @@ def run(args, executor=execute):
                     prepare_preview(data_root, config, args.sample_index, input_path)
                 validate_input(input_path, config)
                 command = prefix + ['src.infer.reconstruct', '--config', str(config_path),
-                    '--average-checkpoint', str(average), '--anomaly-checkpoint', str(anomaly),
+                    '--anomaly-checkpoint', str(anomaly),
                     '--input', str(input_path), '--output', str(destination / 'reconstruction.npz')]
+                if not nearest:
+                    command += ['--average-checkpoint', str(average)]
             state['stages'][stage]['command'] = command
             write_json(state_path, state)
             executor(command, args.run_dir / 'logs' / f'{stage}.log')

@@ -13,6 +13,7 @@ from src.models import AnomalyInpaintingGenerator, AverageEstimationGenerator
 from src.utils.config import load_config
 from src.utils.checkpoint import load_generator_state
 from src.utils.normalization import anomaly_to_sst_scale
+from src.models.temporal_baseline import temporal_mean_nearest
 
 
 REQUIRED_INPUT_KEYS = (
@@ -89,13 +90,20 @@ def run_reconstruction(
     time_steps = int(config["data"]["time_steps"])
     average_generator = AverageEstimationGenerator(time_steps=time_steps).to(device)
     anomaly_generator = AnomalyInpaintingGenerator(time_steps=time_steps, anomaly_scale=anomaly_to_sst_scale(config["data"])).to(device)
-    load_generator_checkpoint(average_generator, average_checkpoint, device)
+    nearest = config["data"].get("baseline_method", "learned") == "temporal_mean_nearest"
+    if not nearest:
+        load_generator_checkpoint(average_generator, average_checkpoint, device)
+    saved = torch.load(anomaly_checkpoint, map_location="cpu", weights_only=False)
+    trained_method = saved.get("config", {}).get("data", {}).get("baseline_method", "learned")
+    if trained_method != config["data"].get("baseline_method", "learned"):
+        raise ValueError("Anomaly checkpoint baseline_method differs; retrain for the new baseline")
     load_generator_checkpoint(anomaly_generator, anomaly_checkpoint, device)
     average_generator.eval()
     anomaly_generator.eval()
 
     with torch.no_grad():
-        pred_weekly = average_generator(
+        diagnostics = temporal_mean_nearest(inputs["sst_volume"], inputs["mask_volume"]) if nearest else None
+        pred_weekly = diagnostics["baseline"] if nearest else average_generator(
             inputs["sst_volume"],
             inputs["mask_volume"],
             inputs["monthly_average"],
@@ -113,6 +121,8 @@ def run_reconstruction(
         "pred_anomaly": pred_anomaly.detach().cpu().numpy(),
         "pred_sst": pred_sst.detach().cpu().numpy(),
     }
+    if nearest:
+        output.update({key: value.cpu().numpy() for key, value in diagnostics.items()})
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     np.savez_compressed(output_path, **output)
@@ -122,7 +132,7 @@ def run_reconstruction(
 def parse_args() -> argparse.Namespace:  # 推論処理: 入力・出力・checkpointのCLI引数を読む
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="config.yaml", help="Path to config.yaml.")
-    parser.add_argument("--average-checkpoint", required=True)
+    parser.add_argument("--average-checkpoint")
     parser.add_argument("--anomaly-checkpoint", required=True)
     parser.add_argument("--input", required=True, help="Input .npz path.")
     parser.add_argument("--output", required=True, help="Output .npz path.")

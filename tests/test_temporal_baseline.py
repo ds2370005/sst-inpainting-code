@@ -1,0 +1,47 @@
+import pytest
+import torch
+from src.models.temporal_baseline import temporal_mean_nearest
+
+
+def test_mean_and_nearest_preserve_observations():
+    s = torch.full((1,1,9,3,3), float('nan'))
+    m = torch.zeros_like(s)
+    s[0,0,0,0,0]=2; s[0,0,1,0,0]=4
+    m[0,0,:2,0,0]=1
+    result=temporal_mean_nearest(s,m)
+    assert torch.all(result['baseline']==3)
+    assert result['observation_count'][0,0,0,0]==2
+    assert result['interpolated_mask'].sum()==8
+    assert result['distance_pixels'][0,0,0,1]==1
+
+
+def test_masked_values_do_not_leak_and_land_is_not_filled():
+    s=torch.full((1,1,9,3,3),999.)
+    m=torch.zeros_like(s); m[:,:,:,0,0]=1; s[:,:,:,0,0]=2
+    ocean=torch.ones(1,1,3,3,dtype=torch.bool); ocean[:,:,2,2]=False
+    result=temporal_mean_nearest(s,m,ocean)
+    assert result['baseline'][0,0,1,1]==2
+    assert result['baseline'][0,0,2,2]==0
+    assert not result['interpolated_mask'][0,0,2,2]
+
+
+def test_all_missing_is_rejected():
+    with pytest.raises(ValueError,match='No valid'):
+        temporal_mean_nearest(torch.zeros(1,1,9,3,3),torch.zeros(1,1,9,3,3))
+
+
+def test_nearest_inference_uses_no_average_checkpoint(tmp_path, monkeypatch):
+    import numpy as np
+    import src.infer.reconstruct as module
+    class Zero(torch.nn.Module):
+        def forward(self, sst, *args):
+            return torch.zeros_like(sst[:,:,0])
+    monkeypatch.setattr(module, 'AnomalyInpaintingGenerator', lambda **kw: Zero())
+    monkeypatch.setattr(module, 'load_generator_checkpoint', lambda *args: None)
+    monkeypatch.setattr(module.torch, 'load', lambda *a,**k: {'config':{'data':{'baseline_method':'temporal_mean_nearest'}}})
+    config={'data':{'time_steps':9,'min_temp':0.,'max_temp':35.,'anomaly_range':5.,'baseline_method':'temporal_mean_nearest'}}
+    path=tmp_path/'input.npz'
+    np.savez(path,sst_volume=np.full((1,9,3,3),.2),mask_volume=np.ones((1,9,3,3)),monthly_average=np.zeros((1,1,3,3)),monthly_mask=np.ones((1,1,3,3)))
+    out=module.run_reconstruction(config=config,average_checkpoint=None,anomaly_checkpoint='unused',input_path=path,output_path=tmp_path/'out.npz',device=torch.device('cpu'))
+    np.testing.assert_allclose(out['pred_sst'],.2)
+    assert (out['observation_count']==9).all()

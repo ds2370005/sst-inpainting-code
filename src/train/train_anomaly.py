@@ -27,6 +27,7 @@ from src.models import AnomalyInpaintingGenerator, AverageEstimationGenerator, D
 from src.utils.config import load_config
 from src.utils.checkpoint import MODEL_FORMAT, load_generator_state
 from src.utils.normalization import anomaly_to_sst_scale
+from src.models.temporal_baseline import temporal_mean_nearest
 
 
 class SyntheticAnomalyDataset(Dataset[dict[str, torch.Tensor]]):  # 学習処理: 形状確認用の異常補完サンプルを乱数で作る
@@ -240,7 +241,10 @@ def train_one_epoch(
             break
 
         batch = move_batch_to_device(raw_batch, device)
-        if average_generator is None:
+        masked_sst, masked_valid = apply_random_cloud_mask(batch)
+        if data_config.get("baseline_method", "learned") == "temporal_mean_nearest":
+            weekly_average = temporal_mean_nearest(masked_sst, masked_valid)["baseline"]
+        elif average_generator is None:
             # Retained for isolated synthetic tests; real CLI requires stage one.
             weekly_average = batch["weekly_average"]
         else:
@@ -253,7 +257,6 @@ def train_one_epoch(
         weekly_average_5d = weekly_average.unsqueeze(2)
         target_sst = batch["target_sst"]
         target_mask = batch["target_mask"]
-        masked_sst, masked_valid = apply_random_cloud_mask(batch)
         with autocast_context():
             pred_anomaly = generator(
                 masked_sst,
@@ -390,7 +393,9 @@ def main() -> None:  # 学習処理: 実データまたはsyntheticで異常補�
     if not args.synthetic and args.data_root is None:
         raise ValueError("Real-data training requires --data-root.")
 
-    if not args.synthetic and args.average_checkpoint is None:
+    config = apply_cli_overrides(load_config(args.config), args)
+    nearest = config["data"].get("baseline_method", "learned") == "temporal_mean_nearest"
+    if not nearest and not args.synthetic and args.average_checkpoint is None:
         raise ValueError("Real-data anomaly training requires --average-checkpoint.")
     config = apply_cli_overrides(load_config(args.config), args)
     config["training"]["average_checkpoint"] = (
@@ -400,9 +405,9 @@ def main() -> None:  # 学習処理: 実データまたはsyntheticで異常補�
     device = resolve_device(str(config["training"]["device"]))
     average_generator = (
         load_frozen_average_generator(args.average_checkpoint, config, device)
-        if args.average_checkpoint else None
+        if args.average_checkpoint and not nearest else None
     )
-    print("Weekly baseline: frozen average generator" if average_generator is not None
+    print("Baseline: nine-frame mean + nearest fill" if nearest else "Weekly baseline: frozen average generator" if average_generator is not None
           else "Weekly baseline: synthetic observed average (isolated debug mode)")
     batch_size = int(config["training"]["batch_size"])
     epochs = int(config["training"]["epochs"])
