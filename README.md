@@ -1,300 +1,290 @@
-> 全工程の管理入口は `main.py` です。[実行手順](docs/main_pipeline.md)（前処理済みデータからの2段階学習・パッチ復元にも対応）。
-
-> 新しい一括前処理・ランダムクロップ・GPV統合ローダーは [統合前処理ガイド](docs/unified_preprocessing.md) を参照してください。以下の旧NPZ用手順と構成は互換経路です。旧前処理は `olds/` に移動しました。
-
 # SST Anomaly Inpainting
 
-衛星「ひまわり」の海面水温（SST: Sea Surface Temperature）画像について、雲によって観測できない部分を深層学習で補完する研究用プロジェクトです。PyTorchを用いて、データの前処理、学習用データの読み込み、2段階のモデル学習、パッチ単位の推論を実装しています。
+ひまわりの海面水温（SST）画像の雲による欠損を補完する、PyTorchによる研究用実装です。
 
-**現在は動作可能なベースラインであり、対象論文の完全再現や復元精度の達成を示すものではありません。** 新しい統合ローダーはGPVを敵対的学習へ供給します。偏差学習では別の学習画像の雲マスクを追加適用します。構造修正と再学習の注意点は [論文対応変更](docs/paper_revision.md) を参照してください。
+**現在の確認対象は「9時刻の観測平均＋最近傍補間を基準SSTとするアノマリーGAN」です。** 平均推定ネットワークを省略し、JCOPEの毎時SSTを識別器の実画像に使います。全域方式も実装していますが、データ読み込み時の計算負荷が大きいため、現在は256×256パッチ方式で動作と学習を確認しています。
 
-## 目次
+平原論文を参考にした変更手法であり、論文の完全再現や欠損領域での精度を保証するものではありません。RAFTは未実装です。
 
-- [手法と処理の流れ](#手法と処理の流れ)
-- [ディレクトリ構成](#ディレクトリ構成)
-- [コードを読む順番](#コードを読む順番)
-- [使用技術・ライブラリ](#使用技術ライブラリ)
-- [実行方法](#実行方法)
-- [データ形式と学習時の扱い](#データ形式と学習時の扱い)
-- [設定項目](#設定項目)
-- [テスト](#テスト)
-- [実装状況と関連資料](#実装状況と関連資料)
+## 方式を選ぶ設定ファイル
 
-## 手法と処理の流れ
+| 設定 | 基準SST | 学習 | 推論 |
+|---|---|---|---|
+| `config_temporal_mean_patch.yaml` | パッチ内の9時刻平均＋最近傍補間 | アノマリーのみ | パッチ復元。現在の確認用 |
+| `config_temporal_mean.yaml` | 全域の9時刻平均＋最近傍補間 | 基準作成後に256×256を切り出す | 全域復元。負荷改善は未実施 |
+| `config.yaml` | 平均推定ネットワークの推定週平均 | 平均推定→アノマリー | 従来のパッチ復元 |
 
-水温を「週平均」と「そこからの偏差」に分けて推定します。ここでの **Anomalyは水温の偏差**を意味します。
+`main.py`の既定値は`config.yaml`です。**新方式は必ず`--config`で指定してください。** コマンドラインのエポック数などによる上書きを含め、実際に使用した設定が実験フォルダの`config.yaml`へ保存されます。サーバーへコードと設定を転送した後、その内容を確認してください。
 
-1. **平均推定（Average Estimation）**：時系列SST・有効画素マスク・月平均SSTから、欠損のない週平均SSTを推定します。
-2. **偏差補完（Anomaly Inpainting）**：時系列SSTと推定週平均の差を使って、対象時刻の偏差を推定します。
-3. **再構成**：推定週平均と偏差を、単位を合わせて加算します。
+## 現在のネットワークと入出力
 
 ```text
-ひまわりのNetCDFデータ
-    ↓ 対象領域の切り出し・品質判定・雲マスク作成
-観測ごとの256×256パッチ（NPZ）＋ 7日／30日平均（NPZ）
-    ↓ 同じ位置の9時刻分を読み込み・正規化
-時系列SST ＋ 有効画素マスク ＋ 月平均SST
-    ↓ 平均推定モデル
-推定週平均SST
-    ↓ 時系列SST・有効画素マスクとともに偏差補完モデルへ入力
-推定偏差
-    ↓ 推定週平均へ換算後の偏差を加算
-復元SSTパッチ
+同じ位置・6時間間隔のSST 9枚 ＋ 各時刻の観測マスク
+    │
+    ├─ 有効な観測だけを画素ごとに平均 → 平均画像1枚
+    │      └─ 残った欠損だけ最近傍補間 → 基準SST 1枚
+    │
+    └─ 各時刻のSST − 基準SST → 偏差9枚 ＋ 観測マスク
+                                  ↓
+                         アノマリー生成器
+                                  ↓
+                         対象時刻の推定偏差1枚
+                                  ↓ 基準SSTを加算
+                            復元SST 1枚
+                                  ↓ 学習時のみ
+               全体識別器：JCOPEの毎時SSTと生成画像を識別
 ```
 
-標準設定では6時間間隔・9時刻分（対象時刻の48時間前から対象時刻まで）を使います。推論CLIに渡す時系列NPZは、別途組み立てと正規化が必要です。
+- 入力時刻は対象時刻の48時間前から対象時刻まで、6時間間隔の9枚です。**この平均は週平均ではありません。**
+- 元の9枚をそれぞれ補間するのではなく、平均後の1枚だけを補間します。
+- 有効な時刻だけを平均し、9時刻すべてで欠損した位置を最近傍の有効な平均値で埋めます。入力全体に有効観測がなければエラーにします。
+- 新方式では追加の人工雲や9時刻共通の雲マスクを適用しません。
+- マスクは1が有効、0が欠損です。SST入力は0～35℃を−1～1へ写像し、欠損は0とマスクで表現します。偏差は±5℃を±1へ写像し、範囲外はクリップします。
 
-## ディレクトリ構成
+### 生成器
+
+学習時の入力はSSTとマスクがそれぞれ`[B,1,9,256,256]`、基準SSTが`[B,1,1,256,256]`、出力偏差が`[B,1,256,256]`です。
+
+偏差とマスクを1×1×1のConv3dで2→1チャネルへ変換し、9時刻を2次元ネットワークの9チャネルとして扱います。
+
+| 部分 | 構成 |
+|---|---|
+| エンコーダ | 出力チャネル32→64→64→128→128→256。3回のstride 2で空間サイズを1/8へ |
+| 拡張畳み込み | 256チャネル、dilation 2・4・8・16 |
+| デコーダ | 畳み込み各2層で128→64→32→16チャネル。途中に3回のバイリニア2倍拡大 |
+| 最終出力 | 3×3畳み込みで1チャネル、−1～1にクリップ |
+| 活性化・境界 | 主にELU、エンコーダ最終層と出力層は線形。反射パディング |
+
+生成器は平均推定・アノマリーで共通の層構成を持ちますが、別の重みです。新方式では平均推定生成器は学習・使用しません。
+
+### 識別器と損失
+
+新設定では全体識別器のみを使用します。5×5・stride 2の畳み込み6層（64→128→256→256→256→512）と4×4の最終層で、SSTパッチ1枚から1値のlogitを出します。中間層はLeakyReLU、全畳み込みにSpectral Normalizationを使用します。
+
+- 再構成損失：観測画素だけの画像L2ノルムをバッチ平均。画素MSEではありません。
+- Gの敵対的損失：`mean(log(1 − D(fake)))`。
+- Dの損失：`−mean(log D(real)) − mean(log(1 − D(fake)))`。
+- Gの合計：`10 × 再構成損失 + 0.1 × 敵対的損失`。
+- 実装はlogitと`logsigmoid`を使用します。Gの敵対的損失が負になることは異常ではありません。
+- JCOPEは画素単位で一致する教師ではなく、独立に抽出した実画像です。アノマリー段階の識別器には偏差ではなく**復元SST**を渡します。
+
+局所PatchGANと`physical_alpha`に対応する旧実験コードは残っていますが、同梱の新設定では使用しません。古い設定に`physical_alpha`が残るとλより優先されるため注意してください。
+
+## フォルダ構成
 
 ```text
 .
-├── README.md                         # プロジェクト概要・構成・実行方法
-├── requirements.txt                  # Pythonの依存ライブラリ
-├── config.yaml                       # データ条件・学習条件・保存先
-├── .gitignore                        # データ・学習結果・キャッシュ等の除外設定
-├── src/                              # 実装コード
-│   ├── himawaridata/                 # 衛星データの取得・前処理・可視化
-│   │   ├── FTP-Ptree.py              # P-TreeからNetCDFをFTP取得
-│   │   ├── crop_nc_to_1650.py         # 前処理CLI、領域切り出し、平均値作成、旧形式保存
-│   │   ├── frame_preprocessing.py    # 観測ごとのパッチを現行NPZ形式で保存
-│   │   └── visualize_crop.py         # 切り出し領域・旧形式のパッチを可視化
-│   ├── datasets/                     # 保存済みデータを学習用Tensorへ変換
-│   │   ├── frame_index.py            # 観測時刻の索引作成・時系列選択・座標整合確認
-│   │   ├── himawari_patch_dataset.py # 実データ学習用Dataset／DataLoader、正規化
-│   │   ├── loaders.py               # JSON／JSONL／CSV索引、NPY／NPZ読み込みの共通処理
-│   │   ├── average_dataset.py       # 索引ファイルに基づく平均推定用Dataset・疑似データ
-│   │   └── anomaly_dataset.py       # 索引ファイルに基づく偏差補完用Dataset・疑似データ
-│   ├── models/                       # ニューラルネットワーク
-│   │   ├── blocks.py                # 反射パディング・畳み込み・ELU等の共通部品
-│   │   ├── generator.py             # 共通Encoder–Decoder、平均推定器、偏差補完器
-│   │   └── discriminator.py         # Spectral Normalization付き識別器
-│   ├── losses/                       # 学習の損失関数
-│   │   ├── reconstruction_loss.py   # 有効画素だけで計算するmasked MSE
-│   │   └── adversarial_loss.py      # 生成器・識別器の敵対的損失（BCE）
-│   ├── train/                        # 学習CLI・最適化・チェックポイント保存
-│   │   ├── train_average.py         # 第1段階：平均推定モデルの学習
-│   │   └── train_anomaly.py         # 第2段階：平均推定器を凍結して偏差モデルを学習
-│   ├── infer/
-│   │   └── reconstruct.py           # 学習済みの2モデルによるパッチ再構成
-│   └── utils/
-│       ├── config.py                # YAML設定の読み込み
-│       └── normalization.py         # 偏差からSST正規化空間へのスケール換算
-├── tests/                            # 前処理・Dataset・モデル・損失・学習・推論のテスト
-└── docs/                             # 設計メモ・論文との対応・実装状況の記録
-    ├── specification.md             # 初期の実装仕様
-    ├── architecture.md              # ネットワーク構造・Tensor形状の設計
-    ├── implementation_plan.md       # 初期の実装計画
-    ├── paper_notes.md               # 論文の手法と実装の対応メモ
-    └── reproduction_audit.md        # 論文との差分・未実装事項の監査記録
+├── main.py                         # 前処理・学習・復元の実行管理
+├── config*.yaml                    # 方式別の設定
+├── requirements.txt
+├── download_himawari_sst.py         # ひまわりFTP取得
+├── check_himawari_download.py       # 取得状況・ファイル確認
+├── check_jcope_download.py          # JCOPEの読み出し確認
+├── src/
+│   ├── preprocessing/
+│   │   ├── Himawari_preprocessing.py # 全域SST・マスク保存
+│   │   ├── JCOPE_preprocessing.py    # 毎時JCOPEを衛星格子へバイリニア補間
+│   │   ├── hourly_assimilation.py    # 毎時・週平均の実画像プール作成
+│   │   ├── full_domain_input.py      # 指定時刻までの全域9枚を読む
+│   │   ├── pipeline.py              # 前処理の統合入口
+│   │   ├── sampling.py              # 学習パッチの索引作成
+│   │   ├── common.py                # NPY・JSONの入出力
+│   │   └── GPV_preprocessing.py     # 旧GPV経路
+│   ├── datasets/                   # 統合Datasetと互換ローダー
+│   │   └── unified_dataset.py      # パッチ読み出し・独立JCOPE抽出
+│   ├── models/
+│   │   ├── generator.py            # 平均推定・アノマリー生成器
+│   │   ├── discriminator.py        # 全体識別器・旧局所識別器
+│   │   ├── temporal_baseline.py     # 9時刻平均・最近傍補間・進捗表示
+│   │   └── blocks.py               # 畳み込み・ELUなど
+│   ├── losses/                     # 再構成・敵対的損失
+│   ├── train/                      # train_average.py / train_anomaly.py
+│   ├── infer/                      # reconstruct.py / full_domain.py
+│   ├── utils/                      # 設定・正規化・チェックポイント
+│   ├── himawaridata/               # 既存の取得・前処理関連コード
+│   └── gcomc/                      # GCOM-C関連コード（新方式では使用しない）
+├── visualize/                      # 画像・ヒストグラム・損失曲線・評価補助
+├── tests/                          # 合成データ等の自動テスト
+├── docs/                           # 設計・実験履歴。旧方式の説明も含む
+├── olds/                           # 旧実装
+├── data/                           # ローカルデータ用。サーバーは外部パスを指定
+└── outputs/                        # 実験設定・ログ・重み・復元結果
 ```
 
-`__init__.py`はPythonパッケージの初期化やクラスの公開に使います（上の一覧では省略）。`average_dataset.py`と`anomaly_dataset.py`は汎用の索引ベースの入口で、通常のひまわり実データ学習CLIは`himawari_patch_dataset.py`を使用します。
+## データと保存先
 
-次のディレクトリは、データ準備や実行時に作成するものです。観測データ・学習済み重みはリポジトリに同梱していません。
+サーバーで使用しているパスの例です。パス名だけでディスクは決まりません。保存前に`df -h /data2/itoh/datas`などで実際のマウントと空き容量を確認してください。
 
-| パスの例 | 内容 |
+| 保存先 | 内容 |
 |---|---|
-| `data_raw/Himawari_raw/` | 入力となるNetCDFデータの配置先 |
-| `data/frames256/` | 前処理済みの観測パッチ・平均値 |
-| `checkpoints/average/` | 平均推定モデルとoptimizer等の保存状態 |
-| `checkpoints/anomaly/` | 偏差補完モデルとoptimizer等の保存状態 |
-| `outputs/` | 推論結果などの出力先 |
+| `/data2/itoh/himawari/data_raw` | ひまわりの元NetCDF |
+| `/data2/itoh/JCOPE-T` | JCOPEの元NetCDF |
+| `/data2/itoh/datas/unified_sst` | 全域ひまわりSST・マスク・索引 |
+| `/data2/itoh/datas/JCOPE-T_aligned` | 衛星格子に合わせた毎時JCOPE |
+| `/data2/itoh/datas/JCOPE-T_physical_pool` | JCOPEの毎時・週平均とパッチ索引 |
+| `/workspace/sst-inpainting-code/outputs` | 学習・復元結果 |
 
-## コードを読む順番
-
-- **モデルを知りたい場合**：[generator.py](src/models/generator.py) → [blocks.py](src/models/blocks.py) → [discriminator.py](src/models/discriminator.py)
-- **データの作り方を知りたい場合**：[crop_nc_to_1650.py](olds/himawaridata/crop_nc_to_1650.py) → [frame_preprocessing.py](olds/himawaridata/frame_preprocessing.py) → [frame_index.py](olds/datasets/frame_index.py) → [himawari_patch_dataset.py](olds/datasets/himawari_patch_dataset.py)
-- **学習・推論を追いたい場合**：[train_average.py](src/train/train_average.py) → [train_anomaly.py](src/train/train_anomaly.py) → [reconstruct.py](src/infer/reconstruct.py)
-- **入出力の具体例を見たい場合**：[tests/](tests/)の各機能に対応するテスト
-
-## 使用技術・ライブラリ
-
-モデルはCNNのEncoder–Decoderを基本とし、拡張畳み込み（dilation=2, 4, 8, 16）、反射パディング、ELU、bilinearアップサンプリング、[-1,1]へのクリッピング出力を使用します。入力の融合には1×1×1のConv3dを使い、その後は時間軸をチャネルとして2次元CNNに渡します。最適化はAdamです。
-
-| ライブラリ | 主な用途 |
-|---|---|
-| PyTorch | モデル定義、自動微分、学習・推論、Dataset／DataLoader |
-| NumPy | 配列処理、欠損値処理、NPY／NPZの入出力 |
-| netCDF4 | 衛星NetCDFデータの読み込み |
-| Matplotlib | 切り出し領域やSSTの可視化 |
-| PyYAML | YAML設定ファイルの読み込み |
-| pytest | 自動テスト |
-
-[requirements.txt](requirements.txt)には、このほか`torchvision`、`scipy`、`pandas`、`xarray`、`rasterio`、`tqdm`が記載されていますが、現行コードでの直接使用はありません。依存バージョンは未固定です。
-
-## 実行方法
-
-以下のコマンドはリポジトリ直下で実行します。
-
-### 1. 依存ライブラリのインストール
-
-```bash
-python -m pip install -r requirements.txt
-```
-
-学習の標準設定はCUDAです。CPUを指定する場合は学習・推論コマンドに`--device cpu`を追加します。
-
-### 2. 観測データの準備・前処理
-
-ひまわりのNetCDFファイルを`data_raw/Himawari_raw/`に用意します。[FTP-Ptree.py](src/himawaridata/FTP-Ptree.py)を使う場合は、環境変数`PTREE_FTP_USER`・`PTREE_FTP_PASS`を設定し、スクリプト内の保存先・取得期間・データバージョンを利用環境に合わせて変更してください。
-
-まず1観測時刻だけを処理する例です。
-
-```bash
-python -m olds.himawaridata.crop_nc_to_1650 \
-  data_raw/Himawari_raw data/frames256 --max-frames 1 --skip-temporal-averages
-```
-
-学習用に全観測と7日／30日平均を作成する場合は、上記2オプションを外します。
-
-```bash
-python -m olds.himawaridata.crop_nc_to_1650 \
-  data_raw/Himawari_raw data/frames256
-```
-
-平均の作成には同じ時刻帯の30日分の履歴が必要です。履歴が足りなくても観測フレーム自体は保存されますが、必要な平均ファイルがない対象は学習サンプルになりません。
-
-### 3. 平均推定モデルの学習
-
-`--data-root`には`frames/himawari/`ではなく、その親の`data/frames256`を渡します。
-
-```bash
-python -m src.train.train_average \
-  --config config.yaml --data-root data/frames256
-```
-
-### 4. 偏差補完モデルの学習
-
-```bash
-python -m src.train.train_anomaly \
-  --config config.yaml --data-root data/frames256 \
-  --average-checkpoint checkpoints/average/latest.pth
-```
-
-実データ学習では`--average-checkpoint`が必須です。平均推定器は一度ロードして`eval`モードで固定し、`no_grad`で推定した週平均を偏差の基準にします。観測週平均をそのまま基準にはしません。チェックポイントにある温度・時刻・衛星等の設定は互換性を確認しますが、重みだけの`state_dict`にはその情報がありません。疑似データによるデバッグ学習では、チェックポイントなしで観測平均を使う経路も残しています。
-
-この旧NPZ経路ではGPVが含まれず、両段階とも再構成損失のみで学習します。統合前処理の出力を指定した場合はGPVによる敵対的損失が有効になります。
-
-### 5. パッチ単位の推論
-
-**観測フレームNPZを直接渡すことはできません。** 次のキーを持つ正規化済みNPZを別途用意します。欠損入力は0埋めし、マスクは有効画素を1とします。
-
-| キー | バッチなしの形状 | 内容 |
-|---|---|---|
-| `sst_volume` | `[1,T,H,W]` | 時系列SST |
-| `mask_volume` | `[1,T,H,W]` | 時系列SSTの有効画素マスク |
-| `monthly_average` | `[1,1,H,W]` | 月平均SST |
-| `monthly_mask` | `[1,1,H,W]` | 月平均の有効画素マスク |
-
-先頭にバッチ次元を持つ5次元配列も受け付けます。標準設定は`T=9`、`H=W=256`です。
-
-```bash
-python -m src.infer.reconstruct \
-  --config config.yaml \
-  --average-checkpoint checkpoints/average/latest.pth \
-  --anomaly-checkpoint checkpoints/anomaly/latest.pth \
-  --input data/inference_input.npz \
-  --output outputs/reconstruction.npz
-```
-
-出力NPZには`pred_weekly`、`pred_anomaly`、`pred_sst`を保存します。学習と同じ設定を使用してください。
+`unified_sst`は256×256パッチだけを保存する形式ではありません。
 
 ```text
-pred_sst = pred_weekly + pred_anomaly × 2 × anomaly_range / (max_temp - min_temp)
-SST（℃） = (pred_sst + 1) × (max_temp - min_temp) / 2 + min_temp
+unified_sst/
+├── dataset.json              # 全域フレームと学習時刻・位置・履歴の索引
+├── run.json                  # 前処理の完了状態・設定
+├── lat.npy / lon.npy         # 共通格子
+└── himawari/YYYYMMDDHHMMSS/
+    ├── sst.npy               # 全域の℃。無効画素はNaN
+    ├── valid_mask.npy        # 1=有効観測
+    ├── cloud_mask.npy        # 1=品質判定後の海上欠損
+    ├── land_mask.npy         # 1=陸
+    └── metadata.json
 ```
 
-`pred_weekly`と`pred_sst`はSST正規化空間の値、`pred_anomaly`は[-1,1]の偏差出力です。偏差を℃にするには`anomaly_range`を掛けます。
+`cloud_mask`は独立した雲分類モデルの出力ではありません。品質判定で除外された海上画素も含みます。学習時に索引の位置でパッチを切り出します。
 
-### 旧形式のデータを使う場合
+## 環境準備
 
-時系列ボリュームを保存する旧形式も明示的に選択できます。
+Python 3.10のサーバー環境で運用しています。GPU学習には環境に対応したPyTorchが必要です。
 
 ```bash
-python -m olds.himawaridata.crop_nc_to_1650 data_raw/Himawari_raw \
-  data/legacy_patches256 --format legacy-volumes
+python3 -m pip install -r requirements.txt
 ```
 
-学習コマンドの`--data-root`を`data/legacy_patches256`へ変更します。偏差学習では同様に`--average-checkpoint`が必要です。`visualize_crop.py`は旧形式を想定しています。
+`eccodes`は旧GPVのGRIB処理用です。ひまわり・JCOPEのみの前処理ではGRIBを読みません。
 
-## データ形式と学習時の扱い
+## 前処理
 
-現行の出力形式は、観測フレームと平均値を分けて保存します。
+前処理済みデータがある場合は再実行不要です。以下は新しい保存先に作成する場合の例です。
+
+```bash
+python3 -m src.preprocessing.pipeline \
+  --config config_temporal_mean_patch.yaml \
+  --himawari-input /data2/itoh/himawari/data_raw \
+  --output /data2/itoh/datas/unified_sst \
+  --bounds 17 50 117 150
+```
+
+JCOPEを衛星の緯度・経度格子に合わせ、学習用プールを作ります。「1km→2km」という倍率だけでなく、座標を一致させる処理です。
+
+```bash
+python3 -m src.preprocessing.JCOPE_preprocessing \
+  --input /data2/itoh/JCOPE-T \
+  --satellite-root /data2/itoh/datas/unified_sst \
+  --output /data2/itoh/datas/JCOPE-T_aligned \
+  --start 2024-08-01 --end 2025-09-30
+
+python3 -m src.preprocessing.hourly_assimilation \
+  --source /data2/itoh/datas/JCOPE-T_aligned \
+  --satellite-root /data2/itoh/datas/unified_sst \
+  --output /data2/itoh/datas/JCOPE-T_physical_pool
+```
+
+新方式のアノマリー学習は毎時プールを使用します。現行のプール作成処理は互換性のため週平均も作成し、配列を複製するため保存容量に注意してください。
+
+## パッチ方式の学習（現在の確認経路）
+
+すべてリポジトリ直下で実行します。`--run-dir`は毎回、新規または空のフォルダを指定してください。
+
+### 1バッチの動作確認
+
+```bash
+python3 main.py \
+  --config config_temporal_mean_patch.yaml \
+  --data-root /data2/itoh/datas/unified_sst \
+  --assimilation-root /data2/itoh/datas/JCOPE-T_physical_pool \
+  --run-dir outputs/temporal_mean_patch_smoke_001 \
+  --start-at anomaly --stop-after anomaly --smoke
+```
+
+`--smoke`は1エポック分の全件学習ではなく、バッチサイズ1・1更新の動作確認です。
+
+### 10エポック学習
+
+```bash
+mkdir -p logs
+nohup python3 -u main.py --config config_temporal_mean_patch.yaml --data-root /data2/itoh/datas/unified_sst --assimilation-root /data2/itoh/datas/JCOPE-T_physical_pool --run-dir outputs/training_temporal_mean_patch_epoch10_001 --start-at anomaly --stop-after anomaly --epochs 10 --batch-size 32 --num-workers 0 > logs/training_temporal_mean_patch_epoch10_001.log 2>&1 < /dev/null &
+echo "学習PID: $!"
+```
+
+設定された学習対象月は2025年・2026年それぞれの4～6月です。対象時刻を月で選び、入力履歴は前月に及ぶ場合があります。JCOPEの実画像は独立抽出であり、衛星と同期間であることを要求しません。
+
+### 進捗確認
+
+```bash
+tail -f logs/training_temporal_mean_patch_epoch10_001.log
+pgrep -af 'main.py|src.train.train_anomaly'
+nvidia-smi
+```
+
+`training.baseline_log_interval`で平均・補間ログの間隔を設定します。1なら毎バッチ、100なら各エポックの最初と100バッチごと、0なら非表示です。パッチ方式の学習で平均の開始・完了、最近傍補間の開始・完了、処理時間、補間画素数、最大補間距離を出します。平均の時間にはCPUへの転送を含みます。
+
+`samples=32`は32サンプルの意味です。各サンプルの9枚を独立に平均し、32枚の基準画像を作ります。32サンプルを混ぜて平均するわけではありません。
+
+## パッチ復元
+
+学習後、例えば前回保存した正規化済み入力NPZを再利用して同じ地点を復元します。入力NPZには`sst_volume`、`mask_volume`、互換性のため`monthly_average`、`monthly_mask`が必要です。新方式では月平均は生成器へ使用しません。
+
+```bash
+python3 main.py \
+  --config outputs/training_temporal_mean_patch_epoch10_001/config.yaml \
+  --run-dir outputs/temporal_mean_patch_preview_001 \
+  --start-at reconstruct --stop-after reconstruct \
+  --anomaly-checkpoint outputs/training_temporal_mean_patch_epoch10_001/checkpoints/anomaly/latest.pth \
+  --inference-input outputs/training_epoch10_preview_001/outputs/preview_input.npz
+```
+
+以前の入力ファイルが存在し、正規化・時刻・位置が比較条件に一致していることが前提です。平均推定モデルのチェックポイントは不要です。
 
 ```text
-data/frames256/
-├── frames/himawari/YYYYmmddHHMMSS_rXX_cXX.npz
-└── averages/himawari/YYYYmmddHHMMSS_rXX_cXX.npz
+outputs/実験名/
+├── config.yaml
+├── run.json / timings.csv
+├── logs/anomaly.log
+├── checkpoints/anomaly/latest.pth
+└── outputs/reconstruction.npz       # 復元を実行した実験のみ
 ```
 
-- **観測NPZ（format_version=2）**：`sst`（float32）と`cloud_mask`（uint8）、各`[256,256]`。観測時刻、衛星名、緯度・経度、元ファイル、区画位置、品質閾値、雲率、有効率等も保存します。
-- **平均NPZ**：`weekly_average`（`[1,H,W]`）と`monthly_average`（`[1,1,H,W]`）、時刻・座標。観測SSTそのものは含みません。
-- **保存単位**：SSTは℃、欠損値はNaNです。保存時の`cloud_mask`は雲・欠損海域が1、晴天海域・陸地が0です。学習時は反転とSSTの有限値判定により、有効画素が1のマスクへ変換します。
-- **パッチ作成**：1650×1650領域の中央1536×1536を、256×256の固定6×6グリッドに分割します。外周部分は含みません。
-- **時系列選択**：同一区画の`[-48,-42,-36,-30,-24,-18,-12,-6,0]`時間の観測を、古い順に読みます。結合したボリュームはディスクに保存せず読み込み時に組み立てます。
-- **学習対象の選別**：必要な観測・平均ファイルがない対象、対象時刻の雲率が閾値を超えるもの、有効な対象SSTがないものは除外します。雲率の分母は全パッチ画素です。過去の観測は全面欠損でも履歴として保持します。
-- **検証・正規化**：メタデータ、配列形状、座標の整合性を確認し、不整合はエラーにします。設定した温度範囲で正規化し、無効入力を0埋めします。
+パッチ復元NPZの`pred_weekly`は互換キー名で、新方式では「9時刻の基準SST」を意味します。`pred_weekly`・`pred_sst`は正規化SST、`pred_anomaly`は偏差単位値です。℃換算はそれぞれ`(x+1)*17.5`、偏差は`x*5`です（設定0～35℃・偏差5℃の場合）。追加の`baseline`も正規化値です。
 
-観測パッチは雲の多さによらずすべて保存し、現行形式では雲マスクの複製プールを作りません。互換性のある既存フレームはスキップし、`--overwrite`で再生成できます。入力や処理条件を変更した場合は新しい出力ディレクトリを使用してください。
+既存の`visualize/visualize_epochsmoke.py`には週平均という旧表示が残っています。また、旧`preview_input.json`と再作成した`dataset.json`のサンプル番号が一致しないと追加可視化で停止する場合があります。表示名や対応確認を省略して精度を判断しないでください。
 
-## 設定項目
+## 全域方式（実装済み・現在は後回し）
 
-[config.yaml](config.yaml)で主な条件を管理します。
+`config_temporal_mean.yaml`の`baseline_scope: full_domain`を使います。平均・補間を全域で行った後、学習ではパッチに切り出します。**現行Datasetはサンプルごとに全域9枚を再処理するためCPU負荷が高く、基準画像の事前保存・再利用は未実装です。**
 
-| 項目 | 標準値 | 意味 |
-|---|---|---|
-| `data.patch_size` | 256 | パッチの一辺の画素数 |
-| `data.time_steps` / `time_interval_hours` | 9 / 6 | 入力時刻数・時間間隔 |
-| `data.max_cloud_fraction` | 0.5 | 学習対象時刻の雲率上限 |
-| `data.min_temp` / `max_temp` | 0 / 35 | SST正規化に使う温度範囲（℃） |
-| `data.anomaly_range` | 5 | 偏差出力のスケール（±5℃） |
-| `training.epochs` / `batch_size` | 30 / 32 | エポック数・バッチサイズ |
-| `training.device` / `mixed_precision` | cuda / false | 実行デバイス・混合精度の有効化 |
-| `optimizer.lr_generator` / `lr_discriminator` | 1e-4 / 1e-8 | 生成器・識別器の学習率 |
-| `loss.lambda_ave_rec` / `lambda_ano_rec` | 各10.0 | 各段階の再構成損失の重み |
-| `loss.lambda_ave_adv` / `lambda_ano_adv` | 各0.1 | 同化データがある場合の敵対的損失の重み |
-| `paths.checkpoint_dir` / `output_dir` | checkpoints / outputs | 保存先の設定 |
+基準画像だけの確認は学習済み重みなしで実行できます。
+
+```bash
+python3 -m src.infer.full_domain \
+  --config config_temporal_mean.yaml \
+  --data-root /data2/itoh/datas/unified_sst \
+  --target-time 2025-04-30T00:00:00 \
+  --output outputs/temporal_mean_full_check_001 --baseline-only
+```
+
+全域復元は同じ全域基準方式で学習した`--anomaly-checkpoint`を指定し、`--baseline-only`を外します。パッチ基準の重みを同じ方式とみなして使用しません。全域生成器入力は8の倍数へ反射パディングし、出力を元サイズへ切り戻します。1650×1650の場合は1656×1656へ拡張します。実データでのGPUメモリ使用量は未確認です。
+
+出力は`baseline_sst.npy`、`observed_sst.npy`、`observation_count.npy`、`interpolated_mask.npy`、`distance_pixels.npy`、`ocean_mask.npy`、`lat.npy`、`lon.npy`、`metadata.json`です。復元時は`pred_anomaly.npy`と`reconstructed_sst.npy`も保存します。**全域出力の水温・偏差は℃**で、陸域はNaNです。
+
+## 制約と評価上の注意
+
+- 旧来の月平均・週平均に基づくサンプル選択条件と、ローダー内の平均計算が残っています。新方式専用の索引再設計は未実施です。
+- パッチ方式はパッチ外の観測を補間に利用できません。現在は全海域の学習パッチを索引で選択し、補間関数へ海陸マスクを渡していません。全域方式は陸域を除外しますが、最近傍距離は海岸線を迂回しません。
+- 新方式は人工雲を追加しません。観測画素の再構成誤差は、本来の雲下の復元精度ではありません。
+- 学習／検証／テストの自動分割と独立検証はメイン処理に組み込まれていません。`visualize/`の評価補助だけで独立評価済みとはなりません。
+- 月や日時の近いサンプルには入力履歴の重複があります。評価分割は履歴・基準画像の作成期間も考慮する必要があります。
+- データ・損失・基準画像の方式を変更した場合は再学習が必要です。生成器を読み込めることと、比較条件が一致することは別です。
+- 過去の`docs/`には平均推定やGPV、局所識別器など別実験の説明があります。現在の実行条件は保存済み設定とコードを確認してください。
 
 ## テスト
 
-モデルの入出力形状を確認する例：
+小規模な合成データで平均、補間、マスク、勾配、学習・推論の経路を検証します。実データの復元品質を保証するテストではありません。
 
 ```bash
-python -m pytest tests/test_generators_forward.py
+OMP_NUM_THREADS=1 python3 -m pytest -q tests/test_temporal_baseline.py tests/test_train_anomaly.py tests/test_full_domain_temporal.py tests/test_main_pipeline.py
 ```
 
-テスト全体を実行する場合：
+## 参考と実装の位置付け
 
-```bash
-python -m pytest
-```
+参考論文：Hirahara et al., *Cloud-Free Sea-Surface-Temperature Image Reconstruction From Anomaly Inpainting Network*, IEEE TGRS, DOI: [10.1109/TGRS.2021.3111649](https://doi.org/10.1109/TGRS.2021.3111649)。
 
-| テストファイル | 確認する内容 |
-|---|---|
-| `test_generators_forward.py` / `test_discriminator_forward.py` | 生成器・識別器の順伝播と入出力形状 |
-| `test_losses.py` | 再構成損失・敵対的損失 |
-| `test_datasets.py` | 汎用の索引ベースDataset |
-| `test_himawari_real_dataset.py` / `test_frame_dataset.py` | NPZ読み込み、正規化、マスク、時系列選択 |
-| `test_himawari_preprocessing.py` / `test_frame_preprocessing.py` | 切り出し・平均作成・観測フレーム保存 |
-| `test_train_average.py` / `test_train_anomaly.py` | 学習処理・チェックポイント・2段階の接続 |
-| `test_reconstruct.py` | 推論結果と偏差の単位換算 |
-
-これらは実装の動作確認であり、実観測に対する復元精度の評価ではありません。
-
-## 実装状況と関連資料
-
-**実装済み**：ひまわりの前処理、時系列Dataset、平均推定器・偏差補完器・識別器、損失関数、2段階学習、チェックポイント保存、正規化済みパッチの推論、自動テスト。
-
-**未実装・未検証の主な事項**：
-
-- 独立したテスト期間とブイ観測による論文同条件の評価。
-- 統合GPVローダーを使った実サーバーでの学習・精度検証。
-- 観測フレームを直接受け付ける推論アダプター、全域の反復パッチ復元・合成。
-- 学習・検証・評価の期間分割、ブイとの照合、RMSE／MAE／bias等の精度評価。
-- GCOM-Cへの対応（現在はひまわりのみ）。
-- GPUでの実学習・AMPの検証。現状はautocastのみでGradScalerはなく、混合精度は既定で無効。
-- 学習再開用CLI。optimizerの状態は保存しますが、再開処理は未実装。
-
-詳細は[再現監査](docs/reproduction_audit.md)を参照してください。ただし、監査記録には平均推定器の接続前の記述が残っています。**現在は、凍結した平均推定器を偏差学習で使用する処理が実装済みです。** その他の`docs/`も初期設計を含むため、現在の動作は本READMEと実装コードを合わせて確認してください。
-
-本プロジェクトが対象とする手法は、Hiraharaらの「Cloud-Free Sea-Surface-Temperature Image Reconstruction From Anomaly Inpainting Network」です。論文との対応メモは[paper_notes.md](docs/paper_notes.md)にまとめています。
+生成器・全体識別器は論文の表I～IIIを参考にしています。現在の観測9時刻平均＋最近傍補間、追加人工雲を使用しない学習、データ期間・データ製品は原著の設定とは異なります。旧方式や変更履歴は`docs/paper_revision.md`、`docs/hirahara_global_gan.md`を参照してください。
