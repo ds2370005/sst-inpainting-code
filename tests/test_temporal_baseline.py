@@ -57,3 +57,16 @@ def test_time_varying_clouds_are_combined_without_common_mask():
     assert result['interpolated_mask'].sum()==1
     torch.testing.assert_close(result['baseline'][0,0,0],torch.tensor([10.,20.]))
     assert result['baseline'][0,0,1,0]==30
+
+
+def test_progress_logging_does_not_change_result(capsys):
+    s=torch.ones(1,1,9,3,3)
+    m=torch.ones_like(s);m[:,:,:,1,1]=0
+    expected=temporal_mean_nearest(s,m)
+    assert capsys.readouterr().out==''
+    actual=temporal_mean_nearest(s,m,log_prefix='[batch=1]')
+    output=capsys.readouterr().out
+    for label in ('平均開始','平均完了','最近傍補間開始','最近傍補間完了','補間画素=1'):
+        assert label in output
+    for key in expected:
+        torch.testing.assert_close(actual[key],expected[key])

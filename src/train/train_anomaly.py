@@ -235,6 +235,9 @@ def train_one_epoch(
     total_rec = 0.0
     total_adv = 0.0
     steps = 0
+    log_interval = int(config["training"].get("baseline_log_interval", 100))
+    if log_interval < 0:
+        raise ValueError("baseline_log_interval must be nonnegative")
 
     for batch_index, raw_batch in enumerate(loader):
         if max_batches is not None and batch_index >= max_batches:
@@ -252,7 +255,10 @@ def train_one_epoch(
                     raise ValueError("Full-domain baseline must be supplied by unified loader")
                 weekly_average = batch["temporal_baseline"]
             else:
-                weekly_average = temporal_mean_nearest(masked_sst, masked_valid)["baseline"]
+                show = log_interval > 0 and (batch_index == 0 or (batch_index + 1) % log_interval == 0)
+                total_batches = min(len(loader), max_batches) if max_batches is not None else len(loader)
+                prefix = f"[基準SST batch={batch_index+1}/{total_batches}]" if show else None
+                weekly_average = temporal_mean_nearest(masked_sst, masked_valid, log_prefix=prefix)["baseline"]
         elif average_generator is None:
             # Retained for isolated synthetic tests; real CLI requires stage one.
             weekly_average = batch["weekly_average"]

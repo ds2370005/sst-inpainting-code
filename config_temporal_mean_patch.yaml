@@ -18,6 +18,7 @@ data:
   sample_transforms: []  # Optional module:ClassName hooks in the unified loader
 
 training:
+  baseline_log_interval: 100  # 最初と100バッチごと。1なら毎バッチ、0なら非表示
   epochs: 10
   batch_size: 32
   num_workers: 0

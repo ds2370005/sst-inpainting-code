@@ -1,10 +1,11 @@
 """観測時刻平均と最近傍補間。入力と同じ水温尺度で基準画像を返す。"""
+import time
 import numpy as np
 import torch
 from scipy.ndimage import distance_transform_edt
 
 
-def temporal_mean_nearest(sst, mask, ocean_mask=None):
+def temporal_mean_nearest(sst, mask, ocean_mask=None, *, log_prefix=None):
     """[B,1,9,H,W] -> 基準SSTと診断情報。全欠損は明示的に拒否する。
 
     ocean_mask は [B,1,H,W]。省略時は全画素を補間対象とするため、
@@ -12,6 +13,11 @@ def temporal_mean_nearest(sst, mask, ocean_mask=None):
     """
     if sst.ndim != 5 or sst.shape[1:3] != (1, 9) or mask.shape != sst.shape:
         raise ValueError('Expected matching [B,1,9,H,W] SST and mask')
+    if log_prefix is not None:
+        if sst.is_cuda:
+            torch.cuda.synchronize(sst.device)
+        print(f"{log_prefix} 平均開始: samples={sst.shape[0]}, frames=9, size={sst.shape[-2]}x{sst.shape[-1]}", flush=True)
+    started = time.perf_counter()
     valid = (mask > 0) & torch.isfinite(sst)
     shape = (sst.shape[0], 1, *sst.shape[-2:])
     ocean = torch.ones(shape, dtype=torch.bool, device=sst.device) if ocean_mask is None else ocean_mask.to(sst.device).bool()
@@ -23,6 +29,12 @@ def temporal_mean_nearest(sst, mask, ocean_mask=None):
     mean_np = mean.detach().float().cpu().numpy()
     count_np = count.cpu().numpy()
     ocean_np = ocean.cpu().numpy()
+    mean_seconds = time.perf_counter() - started
+    missing_count = int(((count_np == 0) & ocean_np).sum())
+    if log_prefix is not None:
+        print(f"{log_prefix} 平均完了: {mean_seconds:.3f}s（CPU転送を含む）, 有効={int(((count_np > 0) & ocean_np).sum())}, 補間対象={missing_count}/{int(ocean_np.sum())}", flush=True)
+        print(f"{log_prefix} 最近傍補間開始", flush=True)
+    started = time.perf_counter()
     filled = mean_np.copy()
     distances = np.zeros(shape, dtype=np.float32)
     for b in range(sst.shape[0]):
@@ -34,6 +46,8 @@ def temporal_mean_nearest(sst, mask, ocean_mask=None):
         filled[b, 0][missing] = mean_np[b, 0][tuple(indices[:, missing])]
         filled[b, 0][~ocean_np[b, 0]] = 0.
         distances[b, 0][missing] = distance[missing]
+    if log_prefix is not None:
+        print(f"{log_prefix} 最近傍補間完了: {time.perf_counter()-started:.3f}s, 補間画素={missing_count}, 最大距離={float(distances.max()):.2f}px", flush=True)
     return {
         'baseline': torch.as_tensor(filled, device=sst.device, dtype=sst.dtype),
         'observation_count': count,
