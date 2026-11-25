@@ -6,7 +6,7 @@ import torch
 import pytest
 from torch.utils.data import DataLoader
 
-from src.train.train_average import (
+from old_network.old_src.train.train_average import (
     SyntheticAverageDataset,
     build_average_training_components,
     create_synthetic_average_loader,

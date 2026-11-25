@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from visualize.frame_visualization import load_sequence
+from old_network.old_visualize.frame_visualization import load_sequence
 
 
 def frames(root):

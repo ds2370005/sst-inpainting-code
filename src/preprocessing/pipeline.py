@@ -3,7 +3,8 @@ import argparse
 from pathlib import Path
 import numpy as np
 from src.utils.config import load_config
-from . import Himawari_preprocessing, GPV_preprocessing
+from . import Himawari_preprocessing
+from old_network.old_src.preprocessing import GPV_preprocessing
 from .common import FORMAT_VERSION, write_json
 from .sampling import build_indices
 

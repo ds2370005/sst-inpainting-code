@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import torch
 
-from src.datasets import AnomalyDataset, ArrayFieldLoader, AverageDataset
+from old_network.old_src.datasets import AnomalyDataset, ArrayFieldLoader, AverageDataset
 
 
 def _config(patch_size: int = 8, time_steps: int = 3) -> dict:

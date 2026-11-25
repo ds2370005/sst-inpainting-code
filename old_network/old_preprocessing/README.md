@@ -9,6 +9,6 @@
 - datasets/frame_index.py
 - datasets/himawari_patch_dataset.py
 
-旧ひまわりCLIは `python -m olds.himawaridata.crop_nc_to_1650 ...`。
-旧GPV CLIは `python olds/data/preprocess_gpv.py ...`。
+旧ひまわりCLIは `python -m old_network.old_preprocessing.himawaridata.crop_nc_to_1650 ...`。
+旧GPV CLIは `python old_network/old_preprocessing/data/preprocess_gpv.py ...`。
 新しい前処理は `python -m src.preprocessing.pipeline` を使用してください。

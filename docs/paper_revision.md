@@ -13,9 +13,9 @@
 | 同上 | アノマリー入力を `SST正規化差 / (2*anomaly_range/(max_temp-min_temp))` に変換し[-1,1]へクリップ | 偏差±anomaly_range℃を±1に揃える。マスク0の入力は0に戻す |
 | `src/models/discriminator.py` | 64→128→256→256→256→512の6段階と4×4の最終畳み込みへ変更 | Table III。256×256→4×4→1×1。従来の空間平均による判定を除去。全畳み込みにspectral normalization |
 | `src/datasets/unified_dataset.py` | 別時刻の学習画像から雲マスクをランダム選択 | 入力に追加遮蔽するための `random_cloud_mask`（1=保持、0=遮蔽）を返す。保存済みcloud_maskは1=雲なので反転する |
-| `olds/datasets/himawari_patch_dataset.py` | 旧形式ローダーにも保存済みの別画像の雲マスク選択を追加 | 旧NPZ・フレーム形式の学習でも追加遮蔽を省略しない。1サンプルのみの場合は別の過去時刻を使う |
+| `old_network/old_preprocessing/datasets/himawari_patch_dataset.py` | 旧形式ローダーにも保存済みの別画像の雲マスク選択を追加 | 旧NPZ・フレーム形式の学習でも追加遮蔽を省略しない。1サンプルのみの場合は別の過去時刻を使う |
 | `src/train/train_anomaly.py` | 追加マスクを入力SSTと入力有効マスクに適用 | 式(9)。target_sstとtarget_maskは変更しないので、人工的に隠した元観測画素にも式(7)の再構成損失がかかる |
-| `src/train/train_average.py` | 月平均損失係数を `1-(epoch_index+1)/epochs` に変更 | 式(6)の現在epochを表示と同じ1始まりに統一。最終epochの月平均項は0。週平均項は残す |
+| `old_network/old_src/train/train_average.py` | 月平均損失係数を `1-(epoch_index+1)/epochs` に変更 | 式(6)の現在epochを表示と同じ1始まりに統一。最終epochの月平均項は0。週平均項は残す |
 | `src/train/train_anomaly.py`, `src/infer/reconstruct.py` | 学習・推論ともconfigから同じ偏差変換尺度を生成器へ渡す | 入出力尺度を一致させる。復元は引き続き「推定週平均＋偏差℃」 |
 | `src/utils/checkpoint.py`, `main.py`, 学習・推論コード | モデル形式 `hirahara_tables_v2` を保存・検査 | 旧構造重みの誤使用を拒否。strictロードを使い、偏差尺度の不一致も拒否 |
 

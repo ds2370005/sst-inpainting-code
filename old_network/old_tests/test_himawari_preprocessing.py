@@ -5,7 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
-from olds.himawaridata.crop_nc_to_1650 import (
+from old_network.old_preprocessing.himawaridata.crop_nc_to_1650 import (
     build_fixed_grid,
     build_time_sequences,
     cloud_mask_pool_path,

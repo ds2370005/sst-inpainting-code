@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import BoundaryNorm, ListedColormap
 import numpy as np
 
-from olds.datasets.frame_index import frame_key, read_frame
+from old_network.old_preprocessing.datasets.frame_index import frame_key, read_frame
 from src.utils.config import load_config
 
 

@@ -5,7 +5,7 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from olds.datasets.himawari_patch_dataset import HimawariPatchDataset
+from old_network.old_preprocessing.datasets.himawari_patch_dataset import HimawariPatchDataset
 from src.losses import masked_mse_loss
 
 

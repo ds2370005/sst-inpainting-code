@@ -6,7 +6,7 @@ import re
 import numpy as np
 from netCDF4 import Dataset, num2date
 from .common import save_frame, write_json
-from .GPV_preprocessing import bilinear
+from .interpolation import bilinear
 
 
 def align(input_root, satellite_root, output, start=None, end=None, max_frames=None):

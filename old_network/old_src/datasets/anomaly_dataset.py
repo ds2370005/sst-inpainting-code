@@ -1,4 +1,4 @@
-"""Average-estimation dataset interfaces."""
+"""Anomaly-inpainting dataset interfaces."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Any
 import torch
 from torch.utils.data import Dataset
 
-from src.datasets.loaders import (
+from old_network.old_src.datasets.loaders import (
     ArrayFieldLoader,
     assert_shape,
     load_index_records,
@@ -16,18 +16,17 @@ from src.datasets.loaders import (
 )
 
 
-AVERAGE_FIELDS = (
+ANOMALY_FIELDS = (
     "sst_volume",
     "mask_volume",
-    "monthly_average",
-    "monthly_mask",
+    "target_sst",
+    "target_mask",
     "weekly_average",
-    "weekly_mask",
-    "assimilation_weekly",
+    "assimilation_sst",
 )
 
 
-class AverageDataset(Dataset[dict[str, torch.Tensor]]):  # データローダー: indexファイルから平均推定用の学習サンプルを読む
+class AnomalyDataset(Dataset[dict[str, torch.Tensor]]):  # データローダー: indexファイルから異常補完用の学習サンプルを読む
     """Dataset backed by an index file of preprocessed tensor field paths."""
 
     def __init__(
@@ -56,8 +55,17 @@ class AverageDataset(Dataset[dict[str, torch.Tensor]]):  # データローダー
                 base_dir=self.base_dir,
                 loader=self.loader,
             )
-            for field in AVERAGE_FIELDS
+            for field in ANOMALY_FIELDS
         }
+        if "random_cloud_mask" in record:
+            sample["random_cloud_mask"] = load_required_tensor(
+                record,
+                "random_cloud_mask",
+                base_dir=self.base_dir,
+                loader=self.loader,
+            )
+        else:
+            sample["random_cloud_mask"] = sample["target_mask"].clone()
         self._validate_sample(sample)
         return sample
 
@@ -67,23 +75,19 @@ class AverageDataset(Dataset[dict[str, torch.Tensor]]):  # データローダー
         patch_size = int(data_config["patch_size"])
         assert_shape(sample["sst_volume"], "sst_volume", (1, time_steps, patch_size, patch_size))
         assert_shape(sample["mask_volume"], "mask_volume", (1, time_steps, patch_size, patch_size))
-        assert_shape(
-            sample["monthly_average"],
-            "monthly_average",
-            (1, 1, patch_size, patch_size),
-        )
-        assert_shape(sample["monthly_mask"], "monthly_mask", (1, 1, patch_size, patch_size))
+        assert_shape(sample["target_sst"], "target_sst", (1, patch_size, patch_size))
+        assert_shape(sample["target_mask"], "target_mask", (1, patch_size, patch_size))
         assert_shape(sample["weekly_average"], "weekly_average", (1, patch_size, patch_size))
-        assert_shape(sample["weekly_mask"], "weekly_mask", (1, patch_size, patch_size))
+        assert_shape(sample["assimilation_sst"], "assimilation_sst", (1, patch_size, patch_size))
         assert_shape(
-            sample["assimilation_weekly"],
-            "assimilation_weekly",
+            sample["random_cloud_mask"],
+            "random_cloud_mask",
             (1, patch_size, patch_size),
         )
 
 
-class SyntheticAverageDataset(Dataset[dict[str, torch.Tensor]]):  # 学習用: 平均推定の形状確認用に疑似バッチを作る
-    """Synthetic AverageDataset-compatible tensors for early pipeline tests."""
+class SyntheticAnomalyDataset(Dataset[dict[str, torch.Tensor]]):  # 学習用: 異常補完の形状確認用に疑似バッチを作る
+    """Synthetic AnomalyDataset-compatible tensors for early pipeline tests."""
 
     def __init__(
         self,
@@ -116,22 +120,22 @@ class SyntheticAverageDataset(Dataset[dict[str, torch.Tensor]]):  # 学習用: �
         del idx
         height = width = self.patch_size
         weekly_average = torch.rand(1, height, width) * 2.0 - 1.0
-        monthly_average = weekly_average.unsqueeze(1) + 0.05 * torch.randn(
-            1,
-            1,
-            height,
-            width,
+        target_sst = (weekly_average + 0.25 * torch.randn_like(weekly_average)).clamp(
+            -1.0,
+            1.0,
         )
-        sst_volume = weekly_average.unsqueeze(1).repeat(1, self.time_steps, 1, 1)
+        sst_volume = target_sst.unsqueeze(1).repeat(1, self.time_steps, 1, 1)
         sst_volume = (sst_volume + 0.1 * torch.randn_like(sst_volume)).clamp(-1.0, 1.0)
+        target_mask = self._mask(1, height, width)
         return {
             "sst_volume": sst_volume,
             "mask_volume": self._mask(1, self.time_steps, height, width),
-            "monthly_average": monthly_average.clamp(-1.0, 1.0),
-            "monthly_mask": self._mask(1, 1, height, width),
+            "target_sst": target_sst,
+            "target_mask": target_mask,
             "weekly_average": weekly_average,
-            "weekly_mask": self._mask(1, height, width),
-            "assimilation_weekly": (
-                weekly_average + 0.02 * torch.randn_like(weekly_average)
-            ).clamp(-1.0, 1.0),
+            "assimilation_sst": (target_sst + 0.02 * torch.randn_like(target_sst)).clamp(
+                -1.0,
+                1.0,
+            ),
+            "random_cloud_mask": target_mask.clone(),
         }

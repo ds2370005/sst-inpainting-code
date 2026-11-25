@@ -179,5 +179,5 @@ def create_training_loader(root,config,*,stage,shuffle=True):
         raise ValueError('Unified preprocessing is incomplete; dataset.json is missing')
     if config['data'].get('assimilation_mode') == 'hourly':
         raise ValueError('Hourly simulation mode requires a unified satellite dataset.json')
-    from olds.datasets.himawari_patch_dataset import create_himawari_loader
+    from old_network.old_preprocessing.datasets.himawari_patch_dataset import create_himawari_loader
     return create_himawari_loader(root,config,stage=stage,shuffle=shuffle)

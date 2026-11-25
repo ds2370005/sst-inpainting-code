@@ -60,7 +60,7 @@ def test_stage_order_and_checkpoint_handoff(setup):
         timings = list(csv.DictReader(handle))
     assert [r['stage'] for r in timings] == ['average', 'anomaly', 'reconstruct', 'total']
     assert all(r['status'] == 'complete' for r in timings)
-    assert [c[3] for c in calls]==['src.train.train_average','src.train.train_anomaly','src.infer.reconstruct']
+    assert [c[3] for c in calls]==['old_network.old_src.train.train_average','src.train.train_anomaly','src.infer.reconstruct']
     assert calls[1][calls[1].index('--average-checkpoint')+1]==str(tmp/'run/checkpoints/average/latest.pth')
     assert '--max-batches' in calls[0]
     with pytest.raises(ValueError,match='empty --run-dir'):runner.run(args,execute)

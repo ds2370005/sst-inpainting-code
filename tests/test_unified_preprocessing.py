@@ -8,7 +8,7 @@ import pytest
 import torch
 import yaml
 from netCDF4 import Dataset
-from src.preprocessing import GPV_preprocessing as gpv
+from old_network.old_src.preprocessing import GPV_preprocessing as gpv
 from src.preprocessing.Himawari_preprocessing import decode_masks
 from src.preprocessing.common import window_sum
 from src.preprocessing.pipeline import run

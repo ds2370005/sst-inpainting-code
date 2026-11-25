@@ -3,11 +3,11 @@
 ## 構成
 
 - `src/preprocessing/Himawari_preprocessing.py`: NetCDFの水温、品質・陸地フラグを読み、℃・雲マスク・陸地マスク・有効マスクを保存。
-- `src/preprocessing/GPV_preprocessing.py`: Psbs/FD01/水深1mを抽出、ひまわりの座標へ双線形補間、日別・連続7日平均を保存。
+- `old_network/old_src/preprocessing/GPV_preprocessing.py`: Psbs/FD01/水深1mを抽出、ひまわりの座標へ双線形補間、日別・連続7日平均を保存。
 - `src/preprocessing/sampling.py`: 再現可能なランダムクロップ位置の索引を作成。
 - `src/preprocessing/pipeline.py`: 上記を順番に実行する入口。
 - `src/datasets/unified_dataset.py`: 時系列・平均・GPVを遅延読み込みしてPyTorchの同じバッチにまとめるローダー。学習コマンドから自動選択。
-- `olds/`: 従来の固定グリッド前処理、GPV前処理、旧NPZ専用ローダーと補助コード。取得用FTPコード・モデル・汎用Dataset・検査用可視化は現位置に残す。
+- `old_network/old_preprocessing/`: 従来の固定グリッド前処理、GPV前処理、旧NPZ専用ローダーと補助コード。取得用FTPコード・モデル・汎用Dataset・検査用可視化は現位置に残す。
 
 保存はNPY＋JSONです。全領域を1時刻ずつ保存し、読み込み時にはメモリマップで必要なパッチだけを読むため、時系列ごとに同じ画素を重複保存しません。入力ファイルは変更しません。
 
@@ -58,7 +58,7 @@ GPVは連続7日・各画素7回すべて有効なときだけ週平均を作り
 ## 学習
 
 ```bash
-python3 -m src.train.train_average \
+python3 -m old_network.old_src.train.train_average \
   --config config.yaml --data-root data/unified_sst
 
 python3 -m src.train.train_anomaly \
@@ -68,7 +68,7 @@ python3 -m src.train.train_anomaly \
 
 共通ローダーが `assimilation_weekly` / `assimilation_sst` を供給するため、既存の敵対的損失の分岐が有効になります。論文の完全再現や精度を保証するものではありません。GPVとひまわりの日時・位置をペアにせず、独立にサンプリングします。初期実装ではその組み合わせもseedとサンプル番号で再現可能に固定します。
 
-正規化は既存と同じ℃からの線形変換で、クリップしません。既定0〜35℃の範囲外は[-1,1]の範囲外になります。範囲を変える場合は前処理・学習両方のconfigを合わせてください。旧NPZ出力を指定した場合は `olds/` のローダーで従来どおり読み込み、GPVは付きません。旧GPVのNPZと新しいNPY形式を混在させないでください。
+正規化は既存と同じ℃からの線形変換で、クリップしません。既定0〜35℃の範囲外は[-1,1]の範囲外になります。範囲を変える場合は前処理・学習両方のconfigを合わせてください。旧NPZ出力を指定した場合は `old_network/old_preprocessing/` のローダーで従来どおり読み込み、GPVは付きません。旧GPVのNPZと新しいNPY形式を混在させないでください。
 
 ## 色彩構造などの拡張
 

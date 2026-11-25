@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import torch
 
-from olds.datasets.himawari_patch_dataset import HimawariPatchDataset, create_himawari_loader
+from old_network.old_preprocessing.datasets.himawari_patch_dataset import HimawariPatchDataset, create_himawari_loader
 
 
 def products(root, *, steps=9, interval=6):

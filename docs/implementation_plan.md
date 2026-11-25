@@ -430,7 +430,7 @@ This test must pass before any dataset implementation.
 
 ## 11. Dataset interfaces
 
-Create `src/datasets/average_dataset.py`.
+Create `old_network/old_src/datasets/average_dataset.py`.
 
 Implement class skeleton first:
 
@@ -454,7 +454,7 @@ class AverageDataset(torch.utils.data.Dataset):
         }
 ```
 
-Create `src/datasets/anomaly_dataset.py`.
+Create `old_network/old_src/datasets/anomaly_dataset.py`.
 
 ```python
 class AnomalyDataset(torch.utils.data.Dataset):
@@ -482,12 +482,12 @@ At first, implement a `SyntheticAverageDataset` and `SyntheticAnomalyDataset` fo
 
 ## 12. Training script for Average Estimation
 
-Create `src/train/train_average.py`.
+Create `old_network/old_src/train/train_average.py`.
 
 Required CLI:
 
 ```bash
-python -m src.train.train_average --config config.yaml --synthetic
+python -m old_network.old_src.train.train_average --config config.yaml --synthetic
 ```
 
 Training loop:

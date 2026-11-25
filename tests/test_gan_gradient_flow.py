@@ -5,7 +5,8 @@ import pytest
 import torch
 
 from src.losses import generator_adversarial_loss
-from src.train import train_average, train_anomaly
+from old_network.old_src.train import train_average
+from src.train import train_anomaly
 from src.utils.config import load_config
 from src.utils.normalization import anomaly_to_sst_scale
 

@@ -88,26 +88,27 @@
 │   │   ├── pipeline.py              # 前処理の統合入口
 │   │   ├── sampling.py              # 学習パッチの索引作成
 │   │   ├── common.py                # NPY・JSONの入出力
-│   │   └── GPV_preprocessing.py     # 旧GPV経路
-│   ├── datasets/                   # 統合Datasetと互換ローダー
+│   │   └── interpolation.py         # JCOPE・旧GPV共通の格子補間
+│   ├── datasets/                   # 現行の統合Dataset
 │   │   └── unified_dataset.py      # パッチ読み出し・独立JCOPE抽出
 │   ├── models/
-│   │   ├── generator.py            # 平均推定・アノマリー生成器
-│   │   ├── discriminator.py        # 全体識別器・旧局所識別器
+│   │   ├── generator.py            # アノマリー生成器・共通層
+│   │   ├── discriminator.py        # 全体識別器
 │   │   ├── temporal_baseline.py     # 9時刻平均・最近傍補間・進捗表示
 │   │   └── blocks.py               # 畳み込み・ELUなど
 │   ├── losses/                     # 再構成・敵対的損失
-│   ├── train/                      # train_average.py / train_anomaly.py
+│   ├── train/                      # train_anomaly.py
 │   ├── infer/                      # reconstruct.py / full_domain.py
-│   ├── utils/                      # 設定・正規化・チェックポイント
-│   ├── himawaridata/               # 既存の取得・前処理関連コード
-│   └── gcomc/                      # GCOM-C関連コード（新方式では使用しない）
+│   └── utils/                      # 設定・正規化・チェックポイント
 ├── visualize/                      # 画像・ヒストグラム・損失曲線・評価補助
 ├── tests/                          # 現方式・共通機能・全域拡張の自動テスト
-├── old_network/                    # 旧データ形式・平均推定・局所PatchGANのテスト
+├── old_network/                    # 旧実装の保管先
+│   ├── old_tests/                  # 旧方式専用の自動テスト（11ファイル）
+│   ├── old_src/                    # 旧平均推定器・学習、局所PatchGAN、旧ローダー・GPV
+│   ├── old_preprocessing/          # 旧olds/の前処理・固定パッチローダー
+│   └── old_visualize/              # 旧フレーム表示・GPV確認
 ├── pytest.ini                      # 通常のテスト対象をtests/に限定
 ├── docs/                           # 設計・実験履歴。旧方式の説明も含む
-├── olds/                           # 旧実装
 ├── data/                           # ローカルデータ用。サーバーは外部パスを指定
 └── outputs/                        # 実験設定・ログ・重み・復元結果
 ```
@@ -297,16 +298,19 @@ OMP_NUM_THREADS=1 python3 -m pytest -q tests/test_temporal_baseline.py tests/tes
 全域方式は新方式の拡張なので `test_full_domain_temporal.py` もここに残しています。
 互換性の拒否チェックや実行管理の旧経路確認は、現行コードの安全性を確かめるため一部残しています。
 
-`old_network/` には旧形式ローダー・旧前処理・平均推定学習・追加人工雲・局所PatchGANのテストを移しました。
-新旧混在ファイルから局所識別と平均推定専用のテストを分離しています。
-このフォルダは旧テストの保管先であり、モデル本体の独立したコピーではありません。
-実装の `src/` と既存の `olds/`、学習済み重み・データは移動していません。
+`old_network/old_tests/` には旧形式ローダー・旧前処理・平均推定学習・追加人工雲・局所PatchGANのテストを保存しています。
+旧実装の本体は `old_network/old_src/`、従来の `olds/` は `old_network/old_preprocessing/` に移動しました。
+旧可視化は `old_network/old_visualize/` にあります。詳細は [旧実装の構成](old_network/README.md) を参照してください。
+
+新旧共通の畳み込み層・損失・実行管理・推論処理は `src/` に残しています。
+旧設定を実行する互換分岐と旧モデル名の遅延読み込み窓口も残しているため、アーカイブは単独実行用の独立プロジェクトではありません。
+現在の設定ファイル、学習済み重み、入力データは移動していません。
 
 ```bash
 # 現方式と共通機能
 OMP_NUM_THREADS=1 python3 -m pytest -q
 # 旧方式を明示的に検査
-OMP_NUM_THREADS=1 python3 -m pytest -q old_network
+OMP_NUM_THREADS=1 python3 -m pytest -q old_network/old_tests
 # 両方を検査
-OMP_NUM_THREADS=1 python3 -m pytest -q tests old_network
+OMP_NUM_THREADS=1 python3 -m pytest -q tests old_network/old_tests
 ```

@@ -253,7 +253,7 @@ def run(args, executor=execute):
                     '--patches-per-frame', str(args.patches_per_frame), '--min-quality', str(args.min_quality)]
             elif stage in ('average', 'anomaly'):
                 validate_data(data_root, config, [stage], False)
-                command = prefix + [f'src.train.train_{stage}', '--config', str(config_path), '--data-root', str(data_root)]
+                command = prefix + [('old_network.old_src.train.train_average' if stage == 'average' else 'src.train.train_anomaly'), '--config', str(config_path), '--data-root', str(data_root)]
                 if stage == 'anomaly' and not nearest:
                     validate_checkpoint(average, config)
                     command += ['--average-checkpoint', str(average)]

@@ -1,7 +1,7 @@
 """Visualize the crop used by ``crop_nc_to_1650.py``.
 
 Example:
-    python -m olds.himawaridata.visualize_crop input.nc crop_overview.png
+    python -m old_network.old_preprocessing.himawaridata.visualize_crop input.nc crop_overview.png
 """
 
 from __future__ import annotations
