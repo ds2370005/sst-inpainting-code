@@ -1,5 +1,5 @@
 # 役割: 前処理で共有する配列・JSONの保存と読み込み、パッチ位置選択の補助処理を提供する。
-"""Shared disk format: full-region memory-mapped arrays, not fixed patches."""
+"""共通保存形式：固定パッチではなく、全域配列をメモリマップで読み込める形で保存する。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 from pathlib import Path
 import json
@@ -45,7 +45,7 @@ def read_array(root, relative, key='sst'):
 
 
 def window_sum(mask, size):
-    """Sum every possible square window without allocating sliding patches."""
+    """各パッチ配列を作らず、すべての正方形窓の合計値を求める。"""
     integral = np.pad(np.asarray(mask, dtype=np.int64), ((1,0),(1,0))).cumsum(0).cumsum(1)
     return integral[size:, size:] - integral[:-size, size:] - integral[size:, :-size] + integral[:-size, :-size]
 

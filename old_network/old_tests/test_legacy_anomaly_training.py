@@ -1,5 +1,5 @@
 # 旧実装・旧テスト: 旧平均推定器の凍結と旧方式のアノマリー学習が期待どおりに動くかを自動検査する。
-"""Tests for the anomaly-stage synthetic training loop."""
+"""合成データを用いたアノマリー学習ループを検査する。"""
 
 # ── 使用するライブラリ・共通処理 ──────────────────
 from src.utils.checkpoint import MODEL_FORMAT
@@ -165,7 +165,7 @@ def test_frozen_average_is_used_and_only_anomaly_updates(tmp_path):
     before = {k: v.clone() for k, v in average.state_dict().items()}
     sample = SyntheticAnomalyDataset(num_samples=1, time_steps=9, patch_size=256)[0]
     sample.pop("assimilation_sst")
-    sample.pop("weekly_average")  # Must not read observed weekly average in connected mode.
+    sample.pop("weekly_average")  # 平均推定器を接続する場合は、観測週平均を基準として読み込まない。
     generator, discriminator, opt_g, opt_d = build_anomaly_training_components(config, device)
     old_anomaly = {k: v.clone() for k, v in generator.state_dict().items()}
     captured = {}

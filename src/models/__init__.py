@@ -1,5 +1,5 @@
 # 役割: src/modelsをPythonパッケージとして扱うための初期化ファイル。
-"""Model components for SST anomaly inpainting."""
+"""SSTアノマリー補完のモデル部品。"""
 
 # ── 使用するライブラリ・共通処理 ──────────────────
 from src.models.discriminator import Discriminator

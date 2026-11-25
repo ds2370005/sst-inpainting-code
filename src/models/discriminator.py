@@ -1,9 +1,8 @@
 # 役割: 256×256のSST全体を識別するネットワークを定義し、設定に応じた識別器を作る。
-"""Table III discriminator: six stride-2 layers, then a 4x4 scalar head.
+"""表IIIの識別器：ストライド2の6層に続き、4×4の出力層でスカラーを得る。
 
-Returns logits. The loss applies log-sigmoid stably.
-The paper's training patch size is 256x256; other sizes are rejected.
-"""
+ロジットを返し、損失側で安定した対数シグモイドを適用する。
+論文の学習パッチサイズ256×256に対応し、それ以外は拒否する。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 import torch
 from torch import nn

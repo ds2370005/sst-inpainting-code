@@ -1,5 +1,5 @@
 # 役割: ひまわりNetCDFから対象海域の水温と雲・陸・有効画素マスクを保存する。
-"""Himawari NetCDF -> full-region Celsius, cloud/land/valid masks."""
+"""ひまわりNetCDFから全域の摂氏水温と雲・陸・有効画素マスクを作る。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime
 from pathlib import Path
@@ -11,7 +11,7 @@ from .common import save_frame
 
 # ── 処理に使用する関数・クラス ──────────────────
 def decode_masks(sst, quality, flags, min_quality):
-    """Cloud-screened missing ocean, not an independent cloud classification."""
+    """独立した雲分類ではなく、雲判定後の欠損海上画素をマスク化する。"""
     values = np.asarray(np.ma.filled(sst, np.nan), dtype=np.float32)
     quality_values = np.asarray(np.ma.filled(quality.astype(np.int16), -1))
     flag_values = np.asarray(np.ma.filled(flags, 0), dtype=np.int64)

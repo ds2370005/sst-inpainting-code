@@ -1,9 +1,8 @@
 # 旧実装・旧テスト: 旧ひまわり前処理が切り出す海域を図にして確認する。
-"""Visualize the crop used by ``crop_nc_to_1650.py``.
+"""crop_nc_to_1650.pyで切り出す範囲を可視化する。
 
-Example:
-    python -m old_network.old_preprocessing.himawaridata.visualize_crop input.nc crop_overview.png
-"""
+実行例：
+    python -m old_network.old_preprocessing.himawaridata.visualize_crop input.nc crop_overview.png"""
 
 from __future__ import annotations
 
@@ -29,7 +28,7 @@ from .crop_nc_to_1650 import (
 
 # ── 処理に使用する関数・クラス ──────────────────
 def create_crop_figure(input_path: Path, output_path: Path) -> None:
-    """Save a three-panel overview of the study area, grid, and one patch."""
+    """対象海域・グリッド・1パッチを並べた3枚の概要図を保存する。"""
     lat_slice, lon_slice, _, _ = study_area_slices(
         input_path,
         DEFAULT_LAT_MIN,
@@ -39,7 +38,7 @@ def create_crop_figure(input_path: Path, output_path: Path) -> None:
     )
     grid = build_fixed_grid(lat_slice, lon_slice, DEFAULT_PATCH_SIZE)
 
-    # Read only the 1650 x 1650 study area, not the complete satellite image.
+    # 衛星画像全体ではなく、1650×1650の対象海域だけを読む。
     sst, _, lat, lon = read_sst_and_mask_patch(
         input_path, lat_slice, lon_slice, min_quality_level=4
     )
@@ -50,7 +49,7 @@ def create_crop_figure(input_path: Path, output_path: Path) -> None:
         grid_top : grid_top + grid_size,
         grid_left : grid_left + grid_size,
     ]
-    # The center patch is used as an easy-to-see example.
+    # 分かりやすい例として中央のパッチを表示する。
     patch_row, patch_column = 2, 2
     y = patch_row * DEFAULT_PATCH_SIZE
     x = patch_column * DEFAULT_PATCH_SIZE

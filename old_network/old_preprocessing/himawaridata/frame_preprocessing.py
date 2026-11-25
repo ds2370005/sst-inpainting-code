@@ -1,5 +1,5 @@
 # 旧実装・旧テスト: 各観測時刻のパッチを個別に保存し、時系列組み立て用のデータを作る。
-"""Store each observation/grid patch once; build temporal volumes in the loader."""
+"""観測時刻・位置ごとのパッチを一度だけ保存し、ローダーで時空間ボリュームを作る。"""
 from __future__ import annotations
 
 # ── 使用するライブラリ・共通処理 ──────────────────
@@ -38,13 +38,11 @@ def create_observation_patches(
     overwrite: bool = False,
     generate_temporal_averages: bool = True,
 ) -> int:
-    """Save all patches, including cloudy ones needed as temporal context.
+    """時系列情報に必要な曇天パッチも含め、すべてのパッチを保存する。
 
-    SST stays in Celsius with missing values as NaN. Cloud mask retains the
-    legacy convention: 1=missing/cloudy ocean, 0=clear ocean or land.
-    A frame is [H,W], without channel or time dimensions. Averages are optional
-    separate products; their absence never prevents saving an observation.
-    """
+    SSTは摂氏、欠損はNaN。雲マスクは旧規約の1＝欠損・雲海上、0＝晴天海上または陸地。
+    フレームは[H,W]で、チャネル・時間次元を持たない。
+    平均は任意の別データであり、不在でも観測の保存を妨げない。"""
     if max_frames is not None and max_frames <= 0:
         raise ValueError("max_frames must be positive")
     indexed = index_netcdf_files(input_root)

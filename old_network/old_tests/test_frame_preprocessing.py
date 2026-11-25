@@ -1,5 +1,5 @@
 # 旧実装・旧テスト: 旧観測パッチの保存・再実行・時間平均作成が期待どおりに動くかを自動検査する。
-"""Single-observation storage tests using small real NetCDF fixtures."""
+"""小さな実形式NetCDFを用いて、単一観測の保存処理を検査する。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime, timedelta
 from pathlib import Path

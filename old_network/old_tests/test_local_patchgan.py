@@ -1,5 +1,5 @@
 # 旧実装・旧テスト: 旧global/local識別器の損失計算と勾配伝播が期待どおりに動くかを自動検査する。
-"""Formula, gradients and hourly chronology; no network or real training data."""
+"""通信や実学習データを使わず、数式・勾配・毎時データの時系列を検査する。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime, timedelta
 import json

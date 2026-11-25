@@ -1,5 +1,5 @@
 # 役割: 保存されたモデルの形式を検査し、互換性を確認して生成器の重みを読み込む。
-"""Explicit boundary between the old simplified network and the paper revision."""
+"""旧簡略ネットワークと論文準拠版のモデル形式を明示的に区別する。"""
 MODEL_FORMAT = 'hirahara_tables_v2'
 
 

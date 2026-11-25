@@ -1,15 +1,14 @@
 #!/usr/bin/env python3
 # 役割: 指定期間のひまわりSSTをFTPから取得し、再試行と取得済みファイルのスキップを行う。
-"""Download hourly P-Tree L3C SST files using only the standard library.
+"""標準ライブラリだけでP-Treeの毎時L3C SSTを取得する。
 
-Credentials: PTREE_FTP_USER / PTREE_FTP_PASSWORD or --user / --password.
-Destination: PTREE_SST_OUTPUT or --output (default: ./data).
-Example: python3 download_himawari_sst.py --output /srv/data/himawari
+認証情報：PTREE_FTP_USER / PTREE_FTP_PASSWORD、または--user / --password。
+保存先：PTREE_SST_OUTPUTまたは--output（既定値：./data）。
+実行例：python3 download_himawari_sst.py --output /srv/data/himawari
 
-This is a finite batch covering all days in the configured months. Rerunning
-skips existing nonempty final files; interrupted .tmp files restart from zero.
-Run only one instance per output directory. FTP sends credentials unencrypted.
-"""
+指定月の全日を対象とする有限の一括処理。再実行時は非空の正式ファイルをスキップし、
+中断した.tmpファイルは最初から取得する。保存先ごとに同時実行は1つに限定する。
+FTPでは認証情報が暗号化されずに送信される。"""
 
 # ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
@@ -36,7 +35,7 @@ LOG = logging.getLogger("himawari_sst")
 
 # ── 処理に使用する関数・クラス ──────────────────
 class LocalWriteError(Exception):
-    """A local disk error must not be retried as a network failure."""
+    """ローカルディスクのエラーを通信障害として再試行しないための例外。"""
 
 
 class FTPClient:
@@ -45,7 +44,7 @@ class FTPClient:
         self.ftp = None
 
     def describe_error(self, exc):
-        """Keep server reply codes while redacting configured credentials."""
+        """設定された認証情報を伏せ、サーバーの応答コードは残す。"""
         message = str(exc)
         secrets = sorted((str(v) for v in (self.args.user, self.args.password) if v),
                          key=len, reverse=True)
@@ -76,7 +75,7 @@ class FTPClient:
         return self.ftp
 
     def retry(self, operation, label):
-        # --retries counts retries after the initial attempt.
+        # --retriesは初回試行の後に行う再試行の回数。
         for attempt in range(self.args.retries + 1):
             try:
                 return operation(self.connect())
@@ -121,7 +120,7 @@ class FTPClient:
             except ftplib.error_perm as exc:
                 if str(exc)[:3] not in {"500", "502", "504"}:
                     raise
-                expected_size = None  # SIZE is optional on FTP servers.
+                expected_size = None  # FTPサーバーによってはSIZE命令に対応していない。
             try:
                 output = temporary.open("wb")
             except OSError as exc:
@@ -142,7 +141,7 @@ class FTPClient:
                     except OSError as exc:
                         raise LocalWriteError(str(exc)) from exc
             except OSError as exc:
-                # Socket errors from retrbinary must reach the retry handler.
+                # retrbinaryのソケットエラーは再試行処理へ伝える。
                 if not output.closed:
                     output.close()
                 raise

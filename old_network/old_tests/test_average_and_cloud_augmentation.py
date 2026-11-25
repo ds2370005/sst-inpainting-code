@@ -1,5 +1,5 @@
 # 旧実装・旧テスト: 旧平均推定器への月平均入力と追加人工雲の適用が期待どおりに動くかを自動検査する。
-"""Paper architecture, unit conversion, augmentation and checkpoint contracts."""
+"""論文の構造・単位変換・データ拡張・チェックポイントの整合性を検査する。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 import pytest
 import torch
@@ -34,8 +34,8 @@ def test_mask_hides_input_but_preserves_supervision():
     before={k:v.clone() for k,v in batch.items()}
     masked,valid=apply_random_cloud_mask(batch)
     assert (masked[:,:,:,0,0]==0).all() and (valid[:,:,:,0,0]==0).all()
-    assert (valid[:,:,:,1,1]==0).all()  # original missing stays missing
-    assert batch['target_mask'][0,0,0,0]==1  # artificially hidden remains supervised
+    assert (valid[:,:,:,1,1]==0).all()  # 元から欠損している画素は欠損のまま。
+    assert batch['target_mask'][0,0,0,0]==1  # 人工的に隠した画素は教師値として残す。
     for k in before:assert torch.equal(before[k],batch[k])
     del batch['random_cloud_mask']
     with pytest.raises(ValueError,match='requires'):apply_random_cloud_mask(batch)

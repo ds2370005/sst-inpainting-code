@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # 役割: 設定に従って前処理・学習・復元を順に実行し、ログと実行時間を保存する。
-"""Manage preprocessing, two-stage training, and patch reconstruction in one run."""
+"""前処理・学習・パッチ復元を一括管理する。"""
 from __future__ import annotations
 
 # ── 使用するライブラリ・共通処理 ──────────────────
@@ -85,7 +85,7 @@ def parse_args(argv=None):
 
 
 def execute(command, log_path):
-    """Stream each child process to the terminal and an experiment log."""
+    """子プロセスの出力を端末と実験ログへ順次書き出す。"""
     environment = dict(os.environ, PYTHONUNBUFFERED='1')
     with log_path.open('w', encoding='utf-8') as log:
         process = subprocess.Popen(command, cwd=ROOT, env=environment,
@@ -119,7 +119,7 @@ def require_file(path):
 
 def validate_data(root, config, stages, preview):
     from src.datasets.unified_dataset import UnifiedSSTDataset
-    # Check only pools needed by the selected stages.
+    # 選択された実行段階で必要なプールだけを確認する。
     for stage in ('average', 'anomaly'):
         if stage in stages or (stage == 'average' and preview):
             UnifiedSSTDataset(root, config, stage=stage)
@@ -141,7 +141,7 @@ def validate_checkpoint(path, config):
 
 
 def prepare_preview(data_root, config, index, destination):
-    """Export a registered training crop; this is explicitly not held-out evaluation."""
+    """登録済み学習パッチを確認用に出力する。未学習データによる評価ではない。"""
     import numpy as np
     from src.datasets.unified_dataset import UnifiedSSTDataset
     from src.infer.reconstruct import REQUIRED_INPUT_KEYS

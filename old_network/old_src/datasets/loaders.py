@@ -1,5 +1,5 @@
 # 旧実装・旧テスト: 旧データ索引とNPY・NPZ配列を読み込み、テンソルへ変換する。
-"""Modular array loading helpers for dataset interfaces."""
+"""データセットで共通使用する配列読み込みの補助処理。"""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ GEOTIFF_EXTENSIONS = {".tif", ".tiff"}
 
 # ── 処理に使用する関数・クラス ──────────────────
 def load_index_records(index_file: str | Path) -> list[dict[str, Any]]:  # データローダー: JSON/JSONL/CSVのindexをサンプル一覧として読む
-    """Load sample records from JSON, JSONL, or CSV index files."""
+    """JSON・JSONL・CSV形式の索引からサンプル情報を読み込む。"""
     path = Path(index_file)
     suffix = path.suffix.lower()
     if suffix == ".json":
@@ -44,15 +44,11 @@ def load_index_records(index_file: str | Path) -> list[dict[str, Any]]:  # デ�
 
 
 class ArrayFieldLoader:  # データローダー: .npy/.npzの配列をTensorに変換する
-    """Load tensor fields from path specs.
+    """パス指定に従って配列を読み込む。
 
-    Supported now:
-    - .npy files
-    - .npz files with an explicit key, or a single array inside
-
-    Extension hooks intentionally raise for NetCDF and GeoTIFF so those loaders
-    can be added without changing Dataset classes.
-    """
+    NPY、またはキーを明示したNPZ・単一配列のNPZに対応する。
+    NetCDFとGeoTIFFは拡張用の入口だけを設け、現状では例外を出す。
+    これらの読み込み機能はデータセットのクラスを変更せず追加できる。"""
 
     def load_tensor(self, spec: str | Mapping[str, Any], base_dir: Path) -> torch.Tensor:
         path, key, index = self._parse_spec(spec, base_dir)

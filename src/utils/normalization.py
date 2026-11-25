@@ -1,5 +1,5 @@
 # 役割: 偏差の正規化値をSSTの正規化尺度へ変換する倍率を計算する。
-"""Shared unit conversions for training and reconstruction."""
+"""学習と復元で共通使用する単位変換。"""
 from __future__ import annotations
 
 # ── 使用するライブラリ・共通処理 ──────────────────
@@ -10,12 +10,10 @@ from typing import Any
 
 # ── 処理に使用する関数・クラス ──────────────────
 def anomaly_to_sst_scale(data: Mapping[str, Any]) -> float:
-    """Convert a unit anomaly output to the normalized SST difference.
+    """単位偏差出力を、正規化SSTの差分尺度へ変換する。
 
-    Anomaly +/-1 means +/-anomaly_range degrees, whereas normalized SST
-    spans two units across max_temp-min_temp degrees. No offset is applied
-    to temperature differences.
-    """
+    偏差の±1は±anomaly_range℃に対応する。一方、SSTの正規化では
+    max_temp-min_temp℃の幅を2に対応させる。温度差にはオフセットを加えない。"""
     minimum = float(data["min_temp"])
     maximum = float(data["max_temp"])
     anomaly_range = float(data["anomaly_range"])

@@ -1,5 +1,5 @@
 # 役割: 衛星の時系列パッチと独立したデータ同化画像を読み込み、学習バッチを作る。
-"""Unified lazy loader. Sample transforms extend features without changing readers."""
+"""必要時にデータを読み込む統合ローダー。読み込み処理を変えずにサンプル変換で特徴を拡張する。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 from pathlib import Path
 import importlib
@@ -23,7 +23,7 @@ def observed_mean(fields, minimum):
 
 
 def load_transforms(names):
-    """Each config entry is 'package.module:ClassName'; classes take no arguments."""
+    """各設定は「package.module:ClassName」形式。引数なしで生成できるクラスを指定する。"""
     transforms=[]
     for name in names:
         module,attribute=name.split(':',1)
@@ -64,7 +64,7 @@ class UnifiedSSTDataset(Dataset):
             print('Satellite target months:',sorted(set(months)),flush=True)
             print('Satellite samples per month:',dict(sorted(Counter(r['time'][:7] for r in self.samples).items())),flush=True)
         # 月の選択は対象時刻だけ。入力履歴・月平均のための過去フレームは維持する。
-        # One eligible crop per source timestamp; never use the target image as donor.
+        # 元の観測時刻ごとに使用可能な切り出し位置を保持し、対象画像自身は追加マスクの提供元にしない。
         donors = {}
         for row in self.samples:
             for path in row['frames']:
@@ -131,7 +131,7 @@ class UnifiedSSTDataset(Dataset):
         sample=dict(sst_volume=sst,mask_volume=mask,weekly_average=weekly,weekly_mask=weekly_mask,
                     monthly_average=monthly,monthly_mask=monthly_mask,
                     target_sst=sst[:,-1].clone(),target_mask=mask[:,-1].clone())
-        # Fixed, reproducible independent sampling; no satellite/GPV time-location pairing.
+        # 再現可能な独立抽出を行う。衛星とGPVの時刻・位置は対応付けない。
         rng=np.random.default_rng(np.random.SeedSequence([self.seed,index]))
         physical=self.pool[int(rng.integers(len(self.pool)))]
         y,x=physical['origin']
@@ -160,7 +160,7 @@ class UnifiedSSTDataset(Dataset):
             y,x=origin
             region=(slice(y,y+self.size),slice(x,x+self.size))
             sample['temporal_baseline'] = result['baseline'][0,:,region[0],region[1]].clone()
-        # Metadata is provided to hooks; only tensor dict is returned for existing training loops.
+        # 拡張処理にはメタデータを渡し、既存の学習ループにはテンソル辞書だけを返す。
         context=dict(target_time=row['time'],origin=origin,
                      lat=self.lat[origin[0]:origin[0]+self.size],lon=self.lon[origin[1]:origin[1]+self.size],
                      gpv_time=physical['time'],gpv_origin=physical['origin'],stage=self.stage)

@@ -1,5 +1,5 @@
 # 役割: 保存された学習ログからエポックごとの損失曲線と集計表を作る。
-"""Plot training-only epoch losses from main.py's saved logs."""
+"""main.pyの保存ログから学習時のエポック別損失を描画する。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 import csv

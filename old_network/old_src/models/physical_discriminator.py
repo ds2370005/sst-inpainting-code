@@ -6,11 +6,10 @@ from src.models.discriminator import Discriminator
 
 # ── 処理に使用する関数・クラス ──────────────────
 class PhysicalModelDiscriminator(nn.Module):
-    """ACPR global/local principle adapted to the TGRS 256px, single-SST output.
+    """ACPRの全体・局所識別をTGRSの256画素・単一SST出力に適用した旧実装。
 
-    Global branch retains Table III. Local branch is a fully convolutional
-    PatchGAN (32x32 logits for a 256x256 image). It is not an exact Fig.8 replica.
-    """
+    全体側は表IIIを保持する。局所側は全畳み込みのPatchGANで、
+    256×256入力から32×32のロジットを返す。図8の厳密な再現ではない。"""
     def __init__(self):
         super().__init__()
         self.global_discriminator = Discriminator()

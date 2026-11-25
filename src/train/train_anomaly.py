@@ -1,5 +1,5 @@
 # 役割: 基準SSTに対する偏差生成器と識別器を学習し、損失ログと重みを保存する。
-"""Train the anomaly-inpainting network on Himawari or synthetic data."""
+"""ひまわりデータまたは合成データでアノマリー補完ネットワークを学習する。"""
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ from src.models.temporal_baseline import temporal_mean_nearest
 
 # ── 処理に使用する関数・クラス ──────────────────
 class SyntheticAnomalyDataset(Dataset[dict[str, torch.Tensor]]):  # 学習処理: 形状確認用の異常補完サンプルを乱数で作る
-    """Random tensors with the same shapes as anomaly-inpainting batches."""
+    """アノマリー学習バッチと同じ形状の乱数テンソルを作る。"""
 
     def __init__(
         self,
@@ -173,7 +173,7 @@ def build_anomaly_training_components(
 
 
 def load_frozen_average_generator(checkpoint_path, config, device):
-    """Load stage one once, checking available normalization metadata."""
+    """正規化情報を確認し、旧方式の第1段階の平均推定器を一度だけ読み込む。"""
     checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=True)
     if "config" in checkpoint:
         saved = checkpoint["config"]["data"]
@@ -188,12 +188,11 @@ def load_frozen_average_generator(checkpoint_path, config, device):
 
 
 def apply_random_cloud_mask(batch):
-    """Eq. (9): modify inputs only; retain original targets/masks for Eq. (7).
+    """式(9)：入力だけを変更し、式(7)用の教師値とマスクは保持する。
 
-    random_cloud_mask is a donor image's clear-sky mask (1=keep).
-    Broadcast one spatial pattern to all temporal frames, so the hidden
-    target cannot be copied from the same location in another input frame.
-    """
+    random_cloud_maskは別画像の晴天マスク（1＝保持）。同じ空間パターンを
+    全入力時刻に適用し、隠した対象を別時刻の同位置からコピーできないようにする。
+    これは旧方式の追加遮蔽であり、現行の自然マスク方式では呼び出さない。"""
     sst, valid = batch['sst_volume'], batch['mask_volume']
     if 'random_cloud_mask' not in batch:
         raise ValueError('Anomaly training requires random_cloud_mask from another training image')
@@ -267,7 +266,7 @@ def train_one_epoch(
                 # 現方式の基準画像：9時刻の観測平均を作り、残る欠損を最近傍補間する。
                 weekly_average = temporal_mean_nearest(masked_sst, masked_valid, log_prefix=prefix)["baseline"]
         elif average_generator is None:
-            # Retained for isolated synthetic tests; real CLI requires stage one.
+            # 独立した合成テスト用の分岐。旧方式での実データ実行には第1段階の平均推定器が必要。
             weekly_average = batch["weekly_average"]
         else:
             with torch.no_grad(), autocast_context():

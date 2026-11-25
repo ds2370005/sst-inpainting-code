@@ -1,5 +1,5 @@
 # 旧実装・旧テスト: 旧時系列可視化の時刻選択と欠落検出が期待どおりに動くかを自動検査する。
-"""Visualization uses exact observation times without training-only filtering."""
+"""学習専用の選別を適用せず、正確な観測時刻で可視化することを確認する。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -39,7 +39,7 @@ def test_missing_time_is_reported_for_explicit_target(tmp_path):
     paths[4].unlink()
     with pytest.raises(ValueError,match=paths[4].name):
         load_sequence(tmp_path,target=paths[-1],patch_size=2)
-    # An individual observation does not need any history.
+    # 単一観測の読み込みに履歴データは必要ない。
     selected,_=load_sequence(tmp_path,target=paths[-1],patch_size=2,time_steps=1)
     assert selected==[paths[-1]]
 
@@ -61,7 +61,7 @@ def test_misaligned_or_malformed_observations_rejected(tmp_path,changes,reason):
 
 def test_auto_selection_skips_empty_sequence(tmp_path):
     paths=frames(tmp_path)
-    # r00 has finite temperatures but all are masked; r01 has valid ocean.
+    # r00は有限の水温でも全画素がマスク済み。r01には有効な海上画素がある。
     for path in paths:
         with np.load(path) as archive:
             data=dict(archive)

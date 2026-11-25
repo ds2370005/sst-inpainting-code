@@ -1,5 +1,5 @@
 # 旧実装・旧テスト: 旧索引形式の配列からアノマリー学習用サンプルを読み込む。
-"""Anomaly-inpainting dataset interfaces."""
+"""アノマリー補完用データセットのインターフェース。"""
 
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ ANOMALY_FIELDS = (
 
 # ── 処理に使用する関数・クラス ──────────────────
 class AnomalyDataset(Dataset[dict[str, torch.Tensor]]):  # データローダー: indexファイルから異常補完用の学習サンプルを読む
-    """Dataset backed by an index file of preprocessed tensor field paths."""
+    """前処理済み配列のパスを記録した索引ファイルに基づくデータセット。"""
 
     def __init__(
         self,
@@ -90,7 +90,7 @@ class AnomalyDataset(Dataset[dict[str, torch.Tensor]]):  # データローダー
 
 
 class SyntheticAnomalyDataset(Dataset[dict[str, torch.Tensor]]):  # 学習用: 異常補完の形状確認用に疑似バッチを作る
-    """Synthetic AnomalyDataset-compatible tensors for early pipeline tests."""
+    """初期動作確認用にAnomalyDatasetと互換の合成テンソルを作る。"""
 
     def __init__(
         self,

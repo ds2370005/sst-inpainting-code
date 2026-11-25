@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # 役割: 復元SSTと参照値の誤差を集計し、散布図や任意の閾値によるROC・PR曲線を出力する。
-"""Regression diagnostics; optional temperature-threshold ROC/PR classification.
+"""回帰結果を診断し、必要に応じて水温閾値によるROC・PR評価も行う。
 
-By default compare reconstruction with observed input pixels, NOT hidden truth.
-External truth NPZ: sst_celsius and valid_mask on exactly the prediction grid.
-"""
+既定では観測済み入力画素と比較するため、欠損下の真値による評価ではない。
+外部参照NPZには、予測と同じ格子のsst_celsiusとvalid_maskを用意する。"""
 from __future__ import annotations
 # ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
@@ -34,7 +33,7 @@ def regression_metrics(truth, prediction):
 
 
 def binary_curves(labels, scores):
-    """Group tied scores before ROC/PR integration; positive class is high SST."""
+    """同点の予測値をまとめてからROC・PRを集計する。高水温側を陽性とする。"""
     labels = np.asarray(labels, dtype=bool)
     positives = int(labels.sum()); negatives = len(labels)-positives
     if not positives or not negatives:
@@ -46,7 +45,7 @@ def binary_curves(labels, scores):
     fp = (ends+1)-tp
     tpr = np.r_[0, tp/positives]; fpr = np.r_[0, fp/negatives]
     precision = np.r_[1, tp/(tp+fp)]
-    # trapezoidal ROC; stepwise AP, not trapezoidal PR area
+    # ROCは台形積分、APは階段状に積算する。PRの台形面積ではない。
     auc = float(np.sum(np.diff(fpr)*(tpr[:-1]+tpr[1:])/2))
     ap = float(np.sum(np.diff(tpr)*precision[1:]))
     return dict(fpr=fpr, tpr=tpr, precision=precision, auc=auc, average_precision=ap)

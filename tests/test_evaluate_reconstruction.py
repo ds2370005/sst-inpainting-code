@@ -1,5 +1,5 @@
 # テスト: 復元誤差・閾値評価とレポート作成が期待どおりに動くかを自動検査する。
-"""Evaluate synthetic predictions without training or accessing server data."""
+"""学習やサーバーデータへのアクセスなしで、合成予測の評価処理を検査する。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 import importlib.util
@@ -40,7 +40,7 @@ def report(tmp_path):
     (tmp_path/'outputs').mkdir()
     (tmp_path/'logs').mkdir()
     (tmp_path/'config.yaml').write_text('data:\n  min_temp: 0\n  max_temp: 20\n')
-    # Reference [0,10,20] C; prediction [1,10,19] C. Last pixel excluded.
+    # 参照値は[0,10,20]℃、予測値は[1,10,19]℃。最後の画素は除外する。
     np.savez(tmp_path/'outputs/reconstruction.npz', pred_sst=np.array([[-.9,0],[.9,0]]))
     np.savez(tmp_path/'outputs/preview_input.npz',
              sst_volume=np.array([[[[-1.,0],[1.,0]]]]),

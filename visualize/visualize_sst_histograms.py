@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # 役割: 観測SST・基準SST・偏差・復元SSTの分布をヒストグラムと統計で比較する。
-"""Compare saved reconstruction distributions; no training or downloads."""
+"""保存済み復元結果の分布を比較する。学習やデータ取得は行わない。"""
 from __future__ import annotations
 
 # ── 使用するライブラリ・共通処理 ──────────────────
@@ -46,7 +46,7 @@ def statistics(values):
 
 
 def observed_weekly(root, input_path, observed):
-    """Recover the same crop's training weekly target, checking source identity."""
+    """元データの識別情報を確認し、同じパッチの学習用週平均を読み出す。"""
     meta = json.loads(input_path.with_suffix('.json').read_text())
     manifest = json.loads((root/'dataset.json').read_text())
     record = manifest['samples'][int(meta['sample_index'])]
@@ -79,7 +79,7 @@ def draw_histograms(path, groups, bins, dpi, records, histogram_rows):
             if not available:
                 ax.text(.5,.5,'No valid pixels',ha='center',transform=ax.transAxes)
                 continue
-            # Shared bins per comparison, spanning all finite values (no clipping).
+            # 比較ごとに共通の階級を使い、有限値の全範囲を含める（切り捨てない）。
             edges = np.histogram_bin_edges(np.concatenate(available), bins=bins)
             for (label, values), values_finite in zip(series.items(), finite):
                 stats = statistics(values)
@@ -135,7 +135,7 @@ def visualize(run_dir, output_dir=None, input_path=None, data_root=None, bins=80
         raise ValueError('No valid observed SST pixels')
     if any(not np.isfinite(v[valid]).all() for v in predictions.values()):
         raise ValueError('Nonfinite prediction on observed valid pixels')
-    # Every curve in each comparison uses exactly the same spatial support.
+    # 各比較のすべての曲線に、まったく同じ画素位置を使用する。
     groups = [
         ('Latest SST / predicted mean / reconstruction',
          {'Observed SST':observed[valid], 'Predicted weekly':weekly[valid], 'Reconstructed SST':restored[valid]}, 'SST (deg C)'),
@@ -162,7 +162,7 @@ def visualize(run_dir, output_dir=None, input_path=None, data_root=None, bins=80
     draw_histograms(output_dir/'comparison.png', groups[:2], bins, dpi, records, histogram_rows)
     if len(groups)>2:
         draw_histograms(output_dir/'average_comparison.png',groups[2:],bins,dpi,records,histogram_rows)
-    # Each predicted output gets its own narrow axis to expose tiny variations.
+    # 微小な変動を確認できるよう、各予測値に専用の狭い表示範囲を設ける。
     zoom = [(label+' (observed pixels; auto range)',{label:values[valid]},
              'SST difference (deg C)' if label=='predicted_anomaly' else 'SST (deg C)')
             for label,values in predictions.items()]

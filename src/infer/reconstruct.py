@@ -1,5 +1,5 @@
 # 役割: 保存済み重みと入力パッチから基準SST・偏差・復元SSTを出力する。
-"""Run two-stage SST reconstruction from preprocessed array inputs."""
+"""前処理済み配列から基準SSTと偏差を用いてSSTを復元する。"""
 
 from __future__ import annotations
 
@@ -47,16 +47,12 @@ def _ensure_5d_volume(tensor: torch.Tensor, name: str) -> torch.Tensor:  # 推�
 
 
 def load_reconstruction_input(path: str | Path) -> dict[str, torch.Tensor]:  # 推論処理: 推論に必要なnpz入力をまとめて読む
-    """Load inference inputs.
+    """推論入力を読み込む。
 
-    Inputs must already use the training SST normalization; missing inputs
-    must be zero-filled with explicit validity masks. Raw frame products are
-    not accepted directly. Outputs pred_weekly/pred_sst are normalized SST;
-    pred_anomaly is the unit anomaly output (multiply by anomaly_range for C).
-
-    The current implementation supports .npz files. Other formats can reuse the
-    dataset loader adapter pattern when real-data integration is added.
-    """
+    入力は学習時と同じSST正規化を済ませ、欠損を0で埋めて有効マスクを付ける。
+    生のフレームデータは直接受け付けない。出力pred_weekly/pred_sstは正規化SST、
+    pred_anomalyは単位偏差であり、anomaly_rangeを掛けると℃になる。
+    現在はNPZに対応する。他形式の追加にはデータローダーの変換方式を利用できる。"""
     path = Path(path)
     if path.suffix.lower() != ".npz":
         raise NotImplementedError("Inference currently supports .npz inputs only.")

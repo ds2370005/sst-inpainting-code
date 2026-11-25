@@ -1,2 +1,2 @@
 # 役割: src/inferをPythonパッケージとして扱うための初期化ファイル。
-"""Inference entry points for SST anomaly inpainting."""
+"""SSTアノマリー補完の推論処理の入口。"""

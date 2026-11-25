@@ -1,5 +1,5 @@
 # 旧実装・旧テスト: 旧フレーム形式の時系列順序・座標整合性・サンプル選別が期待どおりに動くかを自動検査する。
-"""Temporal assembly, alignment and sample selection for frame-format datasets."""
+"""フレーム形式データの時系列組み立て・位置合わせ・サンプル選別を検査する。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime, timedelta
 
@@ -25,7 +25,7 @@ def products(root, *, steps=9, interval=6):
                       sst=np.full((2, 2), i + 10., dtype=np.float32),
                       cloud_mask=np.zeros((2, 2), dtype=np.uint8))
         if i == 0:
-            fields['cloud_mask'][:] = 1  # Cloudy context must not discard target.
+            fields['cloud_mask'][:] = 1  # 履歴画像に雲があるだけで対象サンプルを除外しない。
         np.savez_compressed(path, **fields)
         paths.append(path)
     average = averages / paths[-1].name

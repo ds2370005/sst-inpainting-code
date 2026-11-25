@@ -1,5 +1,5 @@
 # 旧実装・旧テスト: GPVのPsbs・FD01・水深1mを抽出し、衛星格子に揃えた日別・週平均を保存する。
-"""JMA GPV extraction and alignment; independent of satellite preprocessing."""
+"""衛星前処理とは独立して、気象庁GPVの抽出と格子合わせを行う。"""
 from __future__ import annotations
 # ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime, timedelta, timezone
@@ -16,7 +16,7 @@ ARCHIVE = re.compile(r"Z__C_RJTD_(\d{14})_OCN_GPV_Rjp_Gll2km_grib2.tar.gz$")
 
 # ── 処理に使用する関数・クラス ──────────────────
 def read_field(path, ec, initial):
-    """Multi-field GRIB support: search actual parameter and depth, not order."""
+    """複数フィールドのGRIBに対応し、格納順ではなく実際の変数と水深で検索する。"""
     ec.codes_grib_multi_support_on()
     result = None
     with path.open("rb") as f:
@@ -37,7 +37,7 @@ def read_field(path, ec, initial):
                 stamp = datetime.strptime(
                     f"{int(get('dataDate')):08d}{int(get('dataTime')):04d}",
                     "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
-                # Request hours explicitly; ecCodes step keys otherwise depend on units.
+                # ecCodesの時間ステップ情報は単位に依存するため、時間単位を明示的に指定する。
                 ec.codes_set(gid, "stepUnits", 1)
                 if (stamp != initial or get("stepType") != "avg"
                         or float(get("startStep")) != 0 or float(get("endStep")) != 24):
@@ -50,7 +50,7 @@ def read_field(path, ec, initial):
                 if get("gridType") != "regular_ll":
                     raise ValueError("Only regular latitude/longitude grids are supported")
                 ny, nx = int(get("Nj")), int(get("Ni"))
-                # Validate scan layout using coordinates rather than assuming reshape order.
+                # 配列の並べ替え順を仮定せず、座標で走査順序を検証する。
                 lat2 = np.asarray(ec.codes_get_array(gid, "latitudes")).reshape(ny, nx)
                 lon2 = np.asarray(ec.codes_get_array(gid, "longitudes")).reshape(ny, nx)
                 if not (np.allclose(lat2, lat2[:, :1]) and np.allclose(lon2, lon2[:1, :])):
@@ -81,7 +81,7 @@ def extract(archive, scratch, ec, initial):
     with tarfile.open(archive, "r|gz") as tar:
         for member in tar:
             if member.isfile() and member.name.endswith(SUFFIX):
-                # Copy only the required member; never use its name as a local path.
+                # 必要なアーカイブ要素だけをコピーし、格納名をそのままローカルパスに使わない。
                 with tar.extractfile(member) as source, scratch.open("wb") as out:
                     shutil.copyfileobj(source, out, length=1024 * 1024)
                 sst, lat, lon, meta = read_field(scratch, ec, initial)

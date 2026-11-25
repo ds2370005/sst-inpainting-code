@@ -1,5 +1,5 @@
 # 役割: SST時系列とマスクから基準SSTに対する偏差を生成するネットワークと共通層を定義する。
-"""Generator architectures for SST average estimation and anomaly inpainting."""
+"""アノマリー生成器と共通層を定義する。旧平均推定器は互換窓口から読み込む。"""
 
 from __future__ import annotations
 
@@ -60,7 +60,7 @@ def _assert_single_time_volume(
 
 
 class EncoderDecoder2D(nn.Module):  # ネットワーク定義: 時系列特徴を2D画像に戻す共通エンコーダデコーダ
-    """Shared 2D encoder-decoder after temporal features become channels."""
+    """時系列特徴をチャネルに並べた後に適用する共通2次元エンコーダ・デコーダ。"""
 
     def __init__(self, in_channels: int) -> None:
         super().__init__()
@@ -144,7 +144,7 @@ class EncoderDecoder2D(nn.Module):  # ネットワーク定義: 時系列特徴�
 
 
 class AnomalyInpaintingGenerator(nn.Module):  # ネットワーク定義: 週平均からの偏差としてSST異常を補完する
-    """Estimate SST anomaly relative to the predicted weekly average."""
+    """基準SSTに対する水温偏差を推定する。"""
 
     def __init__(self, time_steps: int = 9, *, anomaly_scale: float = 2.0 * 5.0 / 35.0) -> None:
         super().__init__()
@@ -177,7 +177,7 @@ class AnomalyInpaintingGenerator(nn.Module):  # ネットワーク定義: 週平
         # 1枚の基準SSTを時系列方向に複製し、各観測時刻との差分を取れる形にする。
         weekly_feature = weekly_average.repeat(1, 1, time_steps, 1, 1)
         assert weekly_feature.shape == (batch, 1, time_steps, height, width)
-        # Normalize temperature DIFFERENCES by anomaly_range, not the SST span.
+        # 温度差はSSTの全温度幅ではなくanomaly_rangeで正規化する。
         # 観測SST－基準SSTを偏差専用の尺度で正規化する。
         anomaly_volume = ((sst_volume - weekly_feature) / self.anomaly_scale).clamp(-1, 1)
         # 欠損画素の偏差入力を0にし、有効・欠損の区別はマスクとして別に渡す。

@@ -1,14 +1,12 @@
 # 役割: 実画像と生成画像の識別結果から、生成器と識別器の敵対的損失を計算する。
-"""Hirahara Eq. (2): adversarial physical model loss.
+"""平原論文の式(2)：物理モデルに基づく敵対的損失。
 
-Tensor logits use the paper's single global discriminator. Dictionary logits
-retain the optional global/local experiment for older configurations only.
-
-D minimizes -log D(real) - log(1-D(fake)); G minimizes log(1-D(fake)).
-The real term is constant with respect to G and omitted from its update.
-D returns logits; logsigmoid avoids explicitly forming/logging probabilities.
-This differs from the previous non-saturating G objective -log D(fake).
-"""
+テンソル形式のロジットには論文の単一全体識別器を使用する。
+辞書形式のロジットは、旧設定の全体・局所識別器を使う実験用に残している。
+識別器Dは-log D(real)-log(1-D(fake))、生成器Gはlog(1-D(fake))を最小化する。
+実画像の項はGに対して定数のため、Gの更新から省略する。
+Dはロジットを返し、logsigmoidで確率や対数の直接計算を避ける。
+これは以前の非飽和型の生成器目的関数-log D(fake)とは異なる。"""
 
 from __future__ import annotations
 
@@ -25,7 +23,7 @@ def _assert_logits(logits: torch.Tensor, name: str) -> None:  # 学習損失: D�
 
 
 def _single_generator_loss(fake_logits: torch.Tensor) -> torch.Tensor:  # 学習損失: 生成結果を本物と判定させる方向に学習する
-    """Minimize log(1-D(fake)), the generator-dependent term of Eq. (2)."""
+    """式(2)の生成器に依存する項log(1-D(fake))を最小化する。"""
     _assert_logits(fake_logits, "fake_logits")
     return F.logsigmoid(-fake_logits).mean()
 
@@ -43,12 +41,12 @@ def _weighted(outputs, function, beta):
 
 
 def generator_adversarial_loss(fake_logits, beta=0.5):
-    """Eq. (3)-(5): batch/patch mean, then global/local weighting."""
+    """式(3)～(5)：バッチ・パッチ平均を取り、全体・局所の重みを適用する。"""
     return _weighted(fake_logits, _single_generator_loss, beta)
 
 
 def discriminator_loss(real_logits, fake_logits, beta=0.5):
-    """Negative of Eq. (3)-(5), since the optimizer minimizes."""
+    """最適化器が最小化するため、式(3)～(5)の符号を反転する。"""
     if isinstance(real_logits, dict) != isinstance(fake_logits, dict):
         raise ValueError("Real and fake discriminator outputs must have the same structure")
     return (_weighted(real_logits, lambda z: -F.logsigmoid(z).mean(), beta)

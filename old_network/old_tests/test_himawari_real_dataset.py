@@ -1,5 +1,5 @@
 # 旧実装・旧テスト: 旧NPZ学習入力のマスク生成と正規化が期待どおりに動くかを自動検査する。
-"""Tests for direct training from preprocessed Himawari NPZ samples."""
+"""前処理済みひまわりNPZを直接使う学習入力を検査する。"""
 
 # ── 使用するライブラリ・共通処理 ──────────────────
 from pathlib import Path
@@ -16,7 +16,7 @@ def _write_sample(path: Path) -> None:
     sst = np.full((1, 2, 2, 2), 17.5, dtype=np.float32)
     cloud = np.zeros_like(sst, dtype=np.uint8)
     cloud[0, 0, 0, 1] = 1
-    sst[0, 0, 1, 0] = np.nan  # Land/missing but not cloud.
+    sst[0, 0, 1, 0] = np.nan  # 雲ではなく、陸地またはその他の欠損。
     weekly = np.full((1, 2, 2), 17.5, dtype=np.float32)
     weekly[0, 1, 1] = np.nan
     monthly = np.full((1, 1, 2, 2), 17.5, dtype=np.float32)
@@ -44,8 +44,8 @@ def test_real_average_dataset_derives_masks_and_normalizes(tmp_path: Path) -> No
 
     assert sample["sst_volume"].shape == (1, 2, 2, 2)
     assert sample["sst_volume"][0, 0, 0, 0].item() == 0.0
-    assert sample["mask_volume"][0, 0, 0, 1].item() == 0.0  # Cloud.
-    assert sample["mask_volume"][0, 0, 1, 0].item() == 0.0  # Land/missing.
+    assert sample["mask_volume"][0, 0, 0, 1].item() == 0.0  # 雲。
+    assert sample["mask_volume"][0, 0, 1, 0].item() == 0.0  # 陸地・欠損。
     assert sample["weekly_mask"][0, 1, 1].item() == 0.0
     assert torch.isfinite(sample["sst_volume"]).all()
     assert torch.isfinite(sample["weekly_average"]).all()

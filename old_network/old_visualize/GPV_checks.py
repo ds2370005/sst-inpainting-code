@@ -102,7 +102,7 @@ with tarfile.open(archive, "r|gz") as tar:
             if not valid.any():
                 raise RuntimeError("No valid temperature values")
 
-            # JMA Psbs (10, 4, 15) uses kelvin.
+            # 気象庁Psbs（10,4,15）の単位はケルビン。
             kelvin = values[valid]
             celsius = kelvin - 273.15
 

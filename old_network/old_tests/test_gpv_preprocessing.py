@@ -1,5 +1,5 @@
 # 旧実装・旧テスト: 旧GPVの水深選択・単位変換・格子補間・週平均が期待どおりに動くかを自動検査する。
-"""Offline checks: no server data or ecCodes installation required."""
+"""サーバーデータやecCodesの導入を必要としないオフライン検査。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 import importlib.util
 from datetime import datetime, timezone

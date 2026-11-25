@@ -1,5 +1,5 @@
 # テスト: 保存済み入力と重みを使用した復元処理が期待どおりに動くかを自動検査する。
-"""Tests for the reconstruction inference pipeline."""
+"""復元推論の一連の処理を検査する。"""
 
 # ── 使用するライブラリ・共通処理 ──────────────────
 from src.utils.checkpoint import MODEL_FORMAT
@@ -99,6 +99,6 @@ def test_reconstruction_converts_anomaly_units(tmp_path, monkeypatch):
     result = run_reconstruction(config=_config(), average_checkpoint=path,
                                 anomaly_checkpoint=path, input_path=path,
                                 output_path=tmp_path / "output.npz", device=torch.device("cpu"))
-    # Weekly normalized 0 is 17.5 C; unit anomaly +1 adds 5 C, not 17.5 C.
+    # 正規化週平均の0は17.5℃。単位偏差+1は17.5℃ではなく5℃を加える。
     celsius = (result["pred_sst"] + 1) * 35 / 2
     np.testing.assert_allclose(celsius, 22.5, atol=1e-5)

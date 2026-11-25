@@ -1,5 +1,5 @@
 # 役割: ひまわり前処理と学習索引作成をまとめて実行する（旧GPV経路も選択可能）。
-"""One command prepares Himawari masks, aligned GPV, and random crop indices."""
+"""ひまわりのマスク・任意の旧GPV格子合わせ・ランダムパッチ索引を一括作成する。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 from pathlib import Path
@@ -13,7 +13,7 @@ from .sampling import build_indices
 
 # ── 処理に使用する関数・クラス ──────────────────
 def run(args):
-    # Fail before expensive satellite conversion if the GRIB runtime is missing.
+    # GRIB実行環境がなければ、重い衛星変換を始める前に停止する。
     if args.gpv_input is not None:
         import eccodes  # noqa: F401
     config=load_config(args.config)

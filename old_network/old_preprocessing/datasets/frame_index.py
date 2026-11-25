@@ -1,5 +1,5 @@
 # 旧実装・旧テスト: 保存済み観測フレームを時刻で索引化し、時系列サンプルを組み立てる。
-"""Index single-observation products without duplicating temporal arrays."""
+"""時系列配列を重複保存せず、単一観測データを索引化する。"""
 from __future__ import annotations
 
 # ── 使用するライブラリ・共通処理 ──────────────────
@@ -93,7 +93,7 @@ def build_frame_index(root: Path, satellite: str, time_steps: int,
 
 
 def load_temporal_sample(sample: TemporalSample, satellite: str, patch_size: int):
-    # Keep the target explicit rather than treating array position as its identity.
+    # 配列位置を対象の識別情報とせず、対象を明示的に保持する。
     products = [read_frame(path, satellite, patch_size) for path in sample.frames]
     target = products[sample.frames.index(sample.target)]
     averages = read_product(sample.averages, satellite, averages=True)

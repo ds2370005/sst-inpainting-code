@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # 役割: 保存済みひまわりデータの時刻欠落とファイルの読み出し状態を確認する。
-"""Read-only local hourly SST audit; no FTP access or data modification."""
+"""ローカルの毎時SSTを読み取り専用で検査する。FTP接続やデータ変更は行わない。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 import calendar
@@ -67,7 +67,7 @@ def audit(root, start, end, output, deep=False):
                         if name not in ds.variables:
                             raise ValueError(f'Missing variable: {name}')
                         variable = ds.variables[name]
-                        # Read each field in strips to limit RAM; force decompression.
+                        # メモリ消費を抑えるため帯状に分割して読み、圧縮データも実際に展開する。
                         if variable.ndim < 2:
                             variable[:]
                         else:

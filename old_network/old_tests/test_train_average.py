@@ -1,5 +1,5 @@
 # 旧実装・旧テスト: 旧平均推定の合成データによる学習処理が期待どおりに動くかを自動検査する。
-"""Tests for the average-stage synthetic training loop."""
+"""合成データを用いた平均推定の学習ループを検査する。"""
 
 # ── 使用するライブラリ・共通処理 ──────────────────
 from pathlib import Path
@@ -107,7 +107,7 @@ def test_train_average_one_synthetic_batch(tmp_path: Path, physical) -> None:
     )
 
     assert checkpoint_path.exists()
-    assert metrics["epoch_weight"] == 0.0  # one-epoch run is also the final epoch
+    assert metrics["epoch_weight"] == 0.0  # 1エポック実行では、そのエポックが最終エポックでもある。
     for value in metrics.values():
         assert torch.isfinite(torch.tensor(value))
 

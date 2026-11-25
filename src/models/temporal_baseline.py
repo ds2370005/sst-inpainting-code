@@ -14,12 +14,12 @@ def temporal_mean_nearest(sst, mask, ocean_mask=None, *, log_prefix=None):
     ocean_mask は [B,1,H,W]。省略時は全画素を補間対象とするため、
     海陸を区別したい場合は必ず指定する。距離は格子の画素単位。
 
-    Args:
+    引数：
         sst: [B,1,9,H,W]のSST。入力と同じ温度尺度で平均する。
         mask: sstと同じ形。正の値が観測有効画素。
         ocean_mask: [B,1,H,W]の補間対象マスク。省略時は全画素を対象とする。
         log_prefix: 進捗表示の接頭辞。Noneの場合は表示しない。
-    Returns:
+    戻り値：
         dict: baseline（基準SST）、observation_count（観測回数）、
               interpolated_mask（補間位置）、distance_pixels（補間距離）。
     """

@@ -1,5 +1,5 @@
 # 旧実装・旧テスト: 旧NPZ形式のひまわりパッチを読み込み、マスク・平均・正規化を学習入力にまとめる。
-"""Datasets backed directly by NPZ files from Himawari preprocessing."""
+"""ひまわり前処理が保存したNPZを直接読み込むデータセット。"""
 
 from __future__ import annotations
 
@@ -22,12 +22,10 @@ def normalize_sst(array: np.ndarray, min_temp: float, max_temp: float) -> np.nda
 
 
 class HimawariPatchDataset(Dataset[dict[str, torch.Tensor]]):
-    """Read current preprocessor outputs for average or anomaly training.
+    """旧前処理の出力を平均推定またはアノマリー学習用に読み込む。
 
-    Stored values remain Celsius/NaN. This adapter derives valid masks and
-    converts valid SST values to [-1, 1]; invalid values become zero only in
-    the tensors passed to the network.
-    """
+    保存値は摂氏とNaNを保持する。有効マスクを作り、有効SSTを[-1,1]へ変換する。
+    欠損値はネットワークへ渡すテンソル上でのみ0に置換する。"""
 
     REQUIRED_KEYS = {
         "sst_volume",
@@ -131,8 +129,8 @@ class HimawariPatchDataset(Dataset[dict[str, torch.Tensor]]):
         if monthly.shape != (1, 1, self.patch_size, self.patch_size):
             raise ValueError(f"Unexpected monthly_average shape {monthly.shape} in {path}.")
 
-        # Cloud masks contain only clouds. The finite-SST condition separately
-        # excludes land and all other unavailable pixels.
+        # 雲マスクには雲だけを含める。SSTの有限値条件を別に適用し、
+        # 陸地とその他すべての利用不能画素を除外する。
         volume_valid = np.isfinite(sst) & (cloud == 0)
         weekly_valid = np.isfinite(weekly)
         monthly_valid = np.isfinite(monthly)
@@ -153,7 +151,7 @@ class HimawariPatchDataset(Dataset[dict[str, torch.Tensor]]):
         if len(self.paths) == 1:
             if cloud.shape[1] < 2:
                 raise ValueError('Anomaly augmentation needs another training image')
-            # A different timestamp in the training volume is also a donor image.
+            # 学習ボリューム内の別時刻画像も、追加マスクの提供元になる。
             donor_cloud_2d = cloud[:, int(torch.randint(cloud.shape[1]-1, ()).item())]
         else:
             donor = int(torch.randint(len(self.paths)-1, ()).item())

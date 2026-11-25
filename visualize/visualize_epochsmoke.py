@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # 役割: 保存済みの入力・基準SST・偏差・復元結果を比較図として可視化する。
-"""Plot a smoke-run patch preview (one training batch, not accuracy evaluation).
+"""保存済み復元パッチの確認図を作る。精度評価ではない。
 
-Example:
-    python3 visualize/visualize_epochsmoke.py --run-dir outputs/smoke_001
-"""
+実行例：
+    python3 visualize/visualize_epochsmoke.py --run-dir outputs/smoke_001"""
 from __future__ import annotations
 
 # ── 使用するライブラリ・共通処理 ──────────────────
@@ -24,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 # ── 処理に使用する関数・クラス ──────────────────
 def plane(values, name):
-    """Select the first batch/channel from a reconstructed field."""
+    """復元配列から最初のバッチ・チャネルを取り出す。"""
     values = np.asarray(values)
     if values.ndim == 4 and values.shape[0] > 0 and values.shape[1] == 1:
         return values[0, 0]
@@ -133,7 +132,7 @@ def visualize(run_dir, output=None, input_path=None, dpi=150, data_root=None):
             ("Observed SST - predicted weekly", observed_anomaly, True),
             ("Network predicted anomaly", anomaly, True),
         ]
-        # Keep both anomaly panels on the same scale without clipping observed differences.
+        # 観測差分が切り捨てられないよう、2つの偏差図で同じ尺度を使う。
         differences = np.concatenate([
             observed_anomaly[np.isfinite(observed_anomaly)],
             anomaly[np.isfinite(anomaly)],
@@ -194,7 +193,7 @@ def panel_grid(path, panels, low, high, title, dpi, columns=3, binary=False):
 
 
 def export_context(run_dir, input_path, output, config, sst, mask, observed, reconstructed, data_root, dpi):
-    """Describe the reconstruction input, never claim it was the optimization batch."""
+    """復元に使った入力を説明する。学習更新に使ったバッチと同一とは扱わない。"""
     low, high = float(config["min_temp"]), float(config["max_temp"])
     prefix = output.with_suffix("")
     def destination(suffix):
@@ -225,7 +224,7 @@ def export_context(run_dir, input_path, output, config, sst, mask, observed, rec
     panel_grid(destination("_observed_comparison.png"),
                [("Observed latest SST", observed), ("Reconstructed SST", reconstructed)],
                low, high, "Observed-pixel comparison; no ground truth under missing pixels", dpi, columns=2)
-    # Source context requires retained full-frame products and preview provenance.
+    # 元データの確認には、保存された全域フレームとプレビューの出所情報が必要。
     root = Path(data_root).expanduser() if data_root else Path(meta["data_root"]) if meta.get("data_root") else None
     if root is None or not (root / "dataset.json").is_file() or "sample_index" not in meta:
         print("Source overview/weekly mean skipped: supply --data-root and retain preview_input.json.")

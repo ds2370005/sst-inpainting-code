@@ -1,3 +1,3 @@
 # 役割: srcをPythonパッケージとして扱うための初期化ファイル。
-"""Top-level package for SST anomaly inpainting."""
+"""SSTのアノマリー補完処理をまとめる最上位パッケージ。"""
 

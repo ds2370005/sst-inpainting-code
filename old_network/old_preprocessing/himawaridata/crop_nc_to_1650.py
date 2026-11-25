@@ -1,30 +1,23 @@
 # 旧実装・旧テスト: ひまわりの対象海域を切り出し、固定グリッドのパッチと時間平均を保存する。
-"""Create single-observation SST patches (default) or legacy nine-frame volumes.
+"""単一観測SSTパッチ（既定）または旧9時刻ボリュームを作る。
 
-Default output: frames/himawari/*.npz and separate averages/himawari/*.npz.
-No cloud filtering is applied to frame storage; selection belongs to the loader.
-The following description applies to --format legacy-volumes:
+既定ではframes/himawari/*.npzと別のaverages/himawari/*.npzへ保存する。
+フレーム保存時には雲による選別をせず、ローダーで選別する。
+以下は--format legacy-volumesに適用する説明。
 
-The geographic study area is first identified as 17--50 N, 117--150 E, but
-the intermediate 1650 x 1650 arrays are not saved.  Its centered 1536 x 1536
-region is divided into a fixed, nonoverlapping 6 x 6 grid of 256 x 256 patches.
-The same grid is read from nine NetCDF files separated by six hours.
+北緯17～50度・東経117～150度を対象とし、中間の1650×1650配列は保存しない。
+中央1536×1536を、重なりのない256×256の6×6グリッドに分ける。
+6時間間隔の9つのNetCDFから同じグリッドを読む。
+各サンプルのcloud_mask_volumeに9枚のマスクを保存する。
+各2次元マスクも時刻と位置をキーに別プールへ一度保存し、
+別観測のマスクを使った旧方式の人工欠損作成に利用する。
 
-Every saved sample contains the nine aligned masks as ``cloud_mask_volume``. Each
-two-dimensional mask is also stored once in a separate cloud-mask pool, keyed
-by observation time and grid position, so training can draw a mask from a
-different observation to create artificial missing regions.
-
-The JAXA GHRSST L3C product already contains the result of cloud screening.
-Its ``quality_level`` and valid SST pixels are converted to the storage
-convention: 1 = cloud-screened missing ocean; 0 = clear ocean or land.
-The loader converts this to a valid-observation mask for the network.
-Land is explicitly removed with the GHRSST ``l2p_flags`` land bit, so land
-shapes never enter the training cloud-mask pool. Hirahara et al. cite
-Merchant et al. (2005), "Probabilistic
-physically based cloud screening of satellite infrared imagery for operational
-sea surface temperature retrieval", for the cloud-screening method.
-"""
+JAXA GHRSST L3Cには雲判定の結果が既に含まれる。
+quality_levelと水温の有効性から、1＝雲判定後の欠損海上画素、0＝晴天海上または陸地
+という保存規約に変換する。ローダーではネットワーク用の有効観測マスクに直す。
+l2p_flagsの陸地ビットで陸を除外し、雲マスクプールに陸形状を混入させない。
+平原論文は雲判定方法としてMerchantほか（2005）の、衛星赤外画像による
+海面水温取得のための確率的・物理的雲判定の論文を引用している。"""
 
 from __future__ import annotations
 
@@ -80,13 +73,11 @@ def create_cloud_mask(
     l2p_flags: np.ndarray,
     min_quality_level: int = DEFAULT_MIN_QUALITY_LEVEL,
 ) -> np.ndarray:
-    """Return a binary mask containing only cloudy/missing ocean pixels.
+    """雲・欠損の海上画素だけを含む二値マスクを返す。
 
-    The L3C product stores retrieved SST after cloud screening rather than an
-    independent categorical cloud field. Therefore a non-land ocean pixel at
-    which no acceptable SST remains is treated as cloud-screened missing.
-    Convention: 1 = cloud/missing ocean, 0 = clear ocean or land.
-    """
+    L3Cは独立した雲分類ではなく、雲判定後の取得SSTを保存している。
+    陸地以外で許容できるSSTが残っていない画素を雲判定後の欠損として扱う。
+    規約：1＝雲・欠損海上画素、0＝晴天海上または陸地。"""
     if not 0 <= min_quality_level <= 5:
         raise ValueError("min_quality_level must be between 0 and 5.")
     if not (
@@ -117,7 +108,7 @@ def timestamp_from_path(path: Path) -> datetime:
 
 
 def index_netcdf_files(input_root: Path) -> dict[datetime, Path]:
-    """Index files by observation time and reject ambiguous duplicates."""
+    """観測時刻でファイルを索引化し、曖昧な重複を拒否する。"""
     indexed: dict[datetime, Path] = {}
     for path in sorted(input_root.rglob("*.nc")):
         timestamp = timestamp_from_path(path)
@@ -134,7 +125,7 @@ def build_time_sequences(
     time_steps: int = DEFAULT_TIME_STEPS,
     interval_hours: int = DEFAULT_TIME_INTERVAL_HOURS,
 ) -> Iterator[tuple[datetime, list[Path]]]:
-    """Yield oldest-to-newest sequences with exact temporal spacing."""
+    """指定の時間間隔に正確に一致する時系列を古い順に返す。"""
     if time_steps <= 0 or interval_hours <= 0:
         raise ValueError("time_steps and interval_hours must be positive.")
     interval = timedelta(hours=interval_hours)
@@ -167,7 +158,7 @@ def build_fixed_grid(
     area_lon_slice: slice,
     patch_size: int,
 ) -> list[tuple[int, int, slice, slice, int, int]]:
-    """Return a centered, nonoverlapping grid covering complete patches only."""
+    """完全なパッチだけを含む、中央配置で重なりのないグリッドを返す。"""
     area_height = area_lat_slice.stop - area_lat_slice.start
     area_width = area_lon_slice.stop - area_lon_slice.start
     if patch_size <= 0 or patch_size > min(area_height, area_width):
@@ -201,7 +192,7 @@ def read_sst_and_mask_patch(
     lon_slice: slice,
     min_quality_level: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-    """Read one patch as degrees Celsius; missing SST values remain NaN."""
+    """1パッチを摂氏で読み込む。欠損水温はNaNのまま保持する。"""
     with Dataset(path) as dataset:
         missing = {"sea_surface_temperature", "quality_level", "l2p_flags"}.difference(
             dataset.variables
@@ -215,8 +206,8 @@ def read_sst_and_mask_patch(
         l2p_flags = dataset.variables["l2p_flags"][0, lat_slice, lon_slice]
         lat = np.asarray(dataset.variables["lat"][lat_slice])
         lon = np.asarray(dataset.variables["lon"][lon_slice])
-        # netCDF4 automatically applies the GHRSST scale_factor=0.01 and
-        # add_offset=273.15, so sst_raw is already decoded in kelvin.
+        # netCDF4がGHRSSTのscale_factor=0.01と
+        # add_offset=273.15を自動適用するため、sst_rawは既にケルビンに変換されている。
         sst_kelvin = np.asarray(np.ma.filled(sst_raw, np.nan), dtype=np.float32)
         sst = sst_kelvin - np.float32(KELVIN_TO_CELSIUS_OFFSET)
         cloud_mask = create_cloud_mask(
@@ -253,7 +244,7 @@ def extract_aligned_patch_sequence(
             raise ValueError(f"Latitude/longitude grid differs within sequence: {path}")
         sst_frames.append(sst)
         mask_frames.append(mask)
-    # Dataset interface expects [C=1, T, H, W].
+    # データセットの入力形式は[C=1,T,H,W]を想定する。
     return np.stack(sst_frames)[None, ...], np.stack(mask_frames)[None, ...]
 
 
@@ -262,7 +253,7 @@ def extract_aligned_grid_sequence(
     grid: Sequence[tuple[int, int, slice, slice, int, int]],
     min_quality_level: int,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, slice, slice]:
-    """Read the complete grid once per time step instead of once per patch."""
+    """各パッチごとではなく、各時刻に一度だけグリッド全体を読む。"""
     if not grid:
         raise ValueError("grid must contain at least one patch.")
     grid_lat_slice = slice(
@@ -355,14 +346,14 @@ def cloud_mask_pool_path(
     grid_row: int,
     grid_column: int,
 ) -> Path:
-    """Return the unique path for one observation-time/grid cloud mask."""
+    """観測時刻とグリッド位置に対応する一意な雲マスクのパスを返す。"""
     return pool_root / (
         f"{timestamp:%Y%m%d%H%M%S}_r{grid_row:02d}_c{grid_column:02d}_cloud.npy"
     )
 
 
 def save_cloud_mask_to_pool(output_path: Path, cloud_mask: np.ndarray) -> None:
-    """Atomically save one [1, H, W] uint8 mask for random-mask training."""
+    """ランダムマスク学習用の[1,H,W]・uint8マスクをアトミックに保存する。"""
     mask = np.asarray(cloud_mask, dtype=np.uint8)
     if mask.ndim == 2:
         mask = mask[None, ...]
@@ -389,7 +380,7 @@ def update_sample_with_temporal_averages(
     weekly_average: np.ndarray,
     monthly_average: np.ndarray,
 ) -> None:
-    """Atomically add physical-unit weekly/monthly averages to one sample."""
+    """1サンプルに実温度単位の週平均・月平均をアトミックに追加する。"""
     weekly = np.asarray(weekly_average, dtype=np.float32)
     monthly = np.asarray(monthly_average, dtype=np.float32)
     if weekly.ndim == 2:
@@ -460,15 +451,13 @@ def add_temporal_averages_to_samples(
     overwrite: bool = False,
     averages_root: Path | None = None,
 ) -> tuple[int, int, int]:
-    """Compute same-hour 7/30-day averages for saved observations.
+    """保存済み観測の同時刻について7日・30日平均を計算する。
 
-    With averages_root, write separate products without modifying observations.
-    Otherwise update legacy volume files in place.
-
-    Only targets with a complete 30-calendar-day source window are processed.
-    Pixel averages ignore cloudy/missing SSTs; pixels below the paper's minimum
-    observation counts remain NaN. No weekly/monthly validity masks are saved.
-    """
+    averages_root指定時は観測を変更せず別データを保存する。
+    未指定時は旧ボリュームファイルを更新する。
+    30暦日分の元データが揃う対象だけを処理する。
+    画素平均では雲・欠損を無視し、論文の最小観測回数を満たさない画素はNaNにする。
+    週平均・月平均の有効マスクは保存しない。"""
     if not (0 < weekly_days <= monthly_days):
         raise ValueError("Require 0 < weekly_days <= monthly_days.")
     if not 0 < weekly_min_observations <= weekly_days:
@@ -607,7 +596,7 @@ LOG_FIELDS = (
 
 
 def open_processing_log(output_root: Path) -> tuple[object, csv.DictWriter]:
-    """Open an append-only CSV log suitable for interrupted/resumed runs."""
+    """中断・再開に対応できる追記専用CSVログを開く。"""
     output_root.mkdir(parents=True, exist_ok=True)
     log_path = output_root / "processing_log.csv"
     needs_header = not log_path.exists() or log_path.stat().st_size == 0
@@ -620,7 +609,7 @@ def open_processing_log(output_root: Path) -> tuple[object, csv.DictWriter]:
 
 
 def load_logged_cloud_fractions(output_root: Path) -> dict[tuple[str, int, int], float]:
-    """Load previously measured rejected-patch cloud fractions for fast resume."""
+    """再開を速めるため、除外パッチで測定済みの雲被覆率を読み込む。"""
     log_path = output_root / "processing_log.csv"
     if not log_path.exists():
         return {}
@@ -687,7 +676,7 @@ def create_training_patches(
     cloud_mask_pool_root: Path | None = None,
     generate_temporal_averages: bool = True,
 ) -> int:
-    """Create samples plus a deduplicated pool of their per-time cloud masks."""
+    """サンプルと、各時刻の雲マスクを重複排除したプールを作る。"""
     if not 0.0 <= max_cloud_fraction <= 1.0:
         raise ValueError("max_cloud_fraction must be in [0, 1].")
     if cloud_mask_pool_root is None:

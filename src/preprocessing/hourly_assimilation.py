@@ -1,10 +1,9 @@
 # 役割: 格子合わせ済みの毎時シミュレーションから、敵対的学習用の毎時・週平均プールを作る。
-"""Build independent hourly/weekly physical-model pools from aligned Celsius NPY frames.
+"""格子合わせ済みの摂氏NPYから独立した毎時・週平均の物理モデルプールを作る。
 
-Input simulation.json: units=degC, cadence_hours=1, time_basis=UTC,
-frames=[{time: ISO UTC, path: directory containing sst.npy}]. lat/lon.npy
-must already match the satellite grid. Native product decoding is separate.
-"""
+入力simulation.jsonはunits=degC、cadence_hours=1、time_basis=UTCとする。
+framesの各要素はUTC時刻timeとsst.npyを含むディレクトリpathを持つ。
+lat.npy/lon.npyは衛星格子と一致させておく。元製品の読み出し処理は別に行う。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 from collections import deque
@@ -59,7 +58,7 @@ def prepare(source, output, satellite_root, patch_size=256, patches_per_frame=8,
     rng = np.random.default_rng(seed)
     previous = None
     for row, stamp in zip(rows, times):
-        # Never bridge a missing hour with a fictitious weekly mean.
+        # 欠けた時刻を飛ばして、連続していないデータから週平均を作らない。
         if previous is not None and stamp-previous != timedelta(hours=1):
             queue.clear(); sums.fill(0); counts.fill(0)
         values = read_array(source, row['path'])

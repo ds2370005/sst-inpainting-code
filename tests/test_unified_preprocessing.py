@@ -1,5 +1,5 @@
 # テスト: 統合前処理・格子合わせ・索引と学習データ読み込みが期待どおりに動くかを自動検査する。
-"""Small NetCDF + mocked GRIB extraction tests; never contact external servers."""
+"""小さなNetCDFと模擬GRIB抽出を用いたテスト。外部サーバーへは接続しない。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime,timedelta
 from types import SimpleNamespace
@@ -92,7 +92,7 @@ def test_pipeline_and_both_training_stages(prepared):
         assert sample[key].shape==(1,2,2)
         assert sample['monthly_average'].shape==(1,1,2,2)
         assert sample['weekly_mask'].sum()==4
-        # Target Apr 30; same-hour 7 days are Apr 24..30 => mean 27 C.
+        # 対象は4月30日。同時刻の7日間は4月24～30日で、平均は27℃になる。
         torch.testing.assert_close(sample['weekly_average'],torch.full((1,2,2),2*27/35-1),atol=1e-5,rtol=0)
         torch.testing.assert_close(sample['sst_volume'][:,-1],sample['target_sst'])
         assert all(torch.isfinite(v).all() for v in sample.values())
@@ -173,7 +173,7 @@ def test_cloud_augmentation_uses_another_training_timestamp(prepared):
     donor_path,donor_mask=cloud_calls[-1]
     assert donor_path != ds.samples[0]['frames'][-1]
     np.testing.assert_array_equal(sample['random_cloud_mask'].numpy()[0],1-donor_mask)
-    # The supervised target still uses the original observation mask.
+    # 教師値には引き続き元の観測マスクを使用する。
     np.testing.assert_array_equal(sample['target_mask'].numpy(),sample['mask_volume'].numpy()[:,-1])
 
 

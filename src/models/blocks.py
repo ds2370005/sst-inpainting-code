@@ -1,5 +1,5 @@
 # 役割: 生成器で共通使用する反射パディング・畳み込み・ELUなどの部品を定義する。
-"""Reusable model blocks for the SST generators."""
+"""SST生成器で再利用するネットワーク部品。"""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ def _reflection_padding(
 
 
 class ReflectionConv2d(nn.Module):  # ネットワーク部品: 反射パディングのあとにConv2dをかける
-    """ReflectionPad2d followed by Conv2d."""
+    """反射パディング後に2次元畳み込みを適用する。"""
 
     def __init__(
         self,
@@ -61,7 +61,7 @@ class ReflectionConv2d(nn.Module):  # ネットワーク部品: 反射パディ�
 
 
 class ConvELU(nn.Module):  # ネットワーク部品: 反射パディング付きConv2dのあとにELUを通す
-    """Reflection-padded Conv2d followed by ELU."""
+    """反射パディング付き2次元畳み込み後にELUを適用する。"""
 
     def __init__(
         self,
@@ -88,7 +88,7 @@ class ConvELU(nn.Module):  # ネットワーク部品: 反射パディング付�
 
 
 class DilatedConvELU(ConvELU):  # ネットワーク部品: dilationを広げたConvELUを使う
-    """Reflection-padded dilated Conv2d followed by ELU."""
+    """反射パディング付き拡張畳み込み後にELUを適用する。"""
 
     def __init__(
         self,
@@ -106,7 +106,7 @@ class DilatedConvELU(ConvELU):  # ネットワーク部品: dilationを広げた
 
 
 class UpsampleConvELU(nn.Module):  # ネットワーク部品: 2倍アップサンプルしてからConvELUをかける
-    """Bilinear upsampling followed by ConvELU."""
+    """バイリニア拡大後に畳み込みとELUを適用する。"""
 
     def __init__(
         self,

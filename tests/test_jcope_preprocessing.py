@@ -72,7 +72,7 @@ def test_filename_date_must_match_time(tmp_path):
 def test_download_check_complete_and_missing(tmp_path):
     from check_jcope_download import check
     raw,grid=fixture_files(tmp_path)
-    # fixture has only two hours: time-count issue, plus a missing next day.
+    # テストデータは2時間分だけなので、時刻数不足と翌日の欠落を検出する。
     result=check(raw,'2024-08-01','2024-08-02',tmp_path/'report',True)
     assert len(result['issues'])==2
     with Dataset(raw/'TT_20240802.nc','w') as d:

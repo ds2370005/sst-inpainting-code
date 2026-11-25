@@ -1,5 +1,5 @@
 # 旧実装・旧テスト: 旧ひまわりの固定パッチ切り出し・雲マスク・時間平均が期待どおりに動くかを自動検査する。
-"""Focused tests for bulk Himawari patch preprocessing helpers."""
+"""ひまわりパッチの一括前処理を支える補助処理を検査する。"""
 
 # ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime, timedelta
@@ -118,7 +118,7 @@ def test_cloud_mask_pool_save_is_binary_atomic_and_uniquely_named(
 def test_cloud_mask_excludes_land_and_marks_only_missing_ocean() -> None:
     sst = np.ma.asarray([[290.0, np.nan, np.nan, 291.0]])
     quality = np.ma.asarray([[5, 0, 0, 3]])
-    # Second pixel is land; third is missing ocean; fourth is low-quality ocean.
+    # 2番目は陸地、3番目は欠損海上、4番目は低品質の海上画素。
     flags = np.asarray([[0, 2, 0, 0]], dtype=np.int16)
 
     cloud = create_cloud_mask(sst, quality, flags, min_quality_level=4)

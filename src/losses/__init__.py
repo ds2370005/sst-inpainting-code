@@ -1,5 +1,5 @@
 # 役割: src/lossesをPythonパッケージとして扱うための初期化ファイル。
-"""Loss functions for SST anomaly inpainting."""
+"""SSTのアノマリー補完に使用する損失関数。"""
 
 # ── 使用するライブラリ・共通処理 ──────────────────
 from src.losses.adversarial_loss import (

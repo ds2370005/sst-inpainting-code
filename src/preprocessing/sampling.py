@@ -1,5 +1,5 @@
 # 役割: 時系列の揃い方と観測条件を確認し、学習用のランダムパッチ位置を索引にする。
-"""Seeded random spatial indices shared by temporal fields; independent GPV pool."""
+"""乱数シードで再現可能な時系列共通の切り出し位置と、独立したGPVプールを作る。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime,timedelta
 from collections import Counter
@@ -24,7 +24,7 @@ def build_indices(root, frames, gpv, settings):
         if min(valid.shape)<size:
             raise ValueError('Patch size exceeds study area')
         eligible=(window_sum(cloud,size)<=settings['max_cloud_fraction']*size*size)&(window_sum(valid,size)>0)
-        # Do not present land/unknown coast as generated ocean to the discriminator.
+        # 陸地や未確定の沿岸画素を、生成した海上SSTとして識別器に渡さない。
         ocean=(np.asarray(valid,dtype=bool)|np.asarray(cloud,dtype=bool))
         eligible &= window_sum(ocean,size)==size*size
         origins=choose_origins(eligible,count,rng)

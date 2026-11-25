@@ -7,11 +7,11 @@ import numpy as np
 def bilinear(sst, lat, lon, target_lat, target_lon):
     """元格子の周囲4画素を使って、対象座標の水温を求める。
 
-    Args:
+    引数：
         sst: 元格子の水温配列[緯度, 経度]。欠損はNaN。
         lat, lon: 元格子の1次元緯度・経度配列。
         target_lat, target_lon: 揃えたい格子の1次元緯度・経度配列。
-    Returns:
+    戻り値：
         np.ndarray: 対象格子のfloat32水温。範囲外や補間不能な画素はNaN。
     """
     # 緯度・経度が有限値で単調に並んでいるかを確認する。

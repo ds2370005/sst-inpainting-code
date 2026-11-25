@@ -1,5 +1,5 @@
 # テスト: 生成器と識別器の学習時の勾配伝播が期待どおりに動くかを自動検査する。
-"""Adversarial-only backward must reach the first generator layer."""
+"""敵対的損失だけの逆伝播が生成器の最初の層まで届くことを確認する。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 import copy
 
@@ -22,7 +22,7 @@ def test_adversarial_gradient_and_optimizer_updates(stage):
     module = train_average if stage == 'average' else train_anomaly
     build = getattr(module, f'build_{stage}_training_components')
     g, d, opt_g, opt_d = build(config, torch.device('cpu'))
-    # Smooth spatial signal, rather than a spatially constant toy image.
+    # 一様な画像ではなく、空間的に滑らかに変化するテスト画像を使う。
     axis = torch.linspace(-.5, .5, 256)
     yy, xx = torch.meshgrid(axis, axis, indexing='ij')
     sst = (xx + yy)[None, None, None].repeat(1, 1, 9, 1, 1)
@@ -52,7 +52,7 @@ def test_adversarial_gradient_and_optimizer_updates(stage):
         prediction = g(sst, mask, monthly, torch.ones_like(monthly))
     else:
         prediction = weekly + g(sst, mask, weekly.unsqueeze(2)) * anomaly_to_sst_scale(config['data'])
-    # No reconstruction loss here: any gradient must come through D.
+    # 再構成損失を使用しないため、勾配は必ず識別器を通って伝わる。
     generator_adversarial_loss(d(prediction)).backward()
     first_gradient = next(g.parameters()).grad
     assert first_gradient is not None and torch.isfinite(first_gradient).all()

@@ -1,5 +1,5 @@
 # テスト: 最近傍基準のアノマリー学習処理が期待どおりに動くかを自動検査する。
-"""Tests for the anomaly-stage synthetic training loop."""
+"""合成データを用いたアノマリー学習ループを検査する。"""
 
 # ── 使用するライブラリ・共通処理 ──────────────────
 from src.utils.checkpoint import MODEL_FORMAT

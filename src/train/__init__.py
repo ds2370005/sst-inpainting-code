@@ -1,3 +1,3 @@
 # 役割: src/trainをPythonパッケージとして扱うための初期化ファイル。
-"""Training entry points for the average and anomaly stages."""
+"""学習処理の入口。現行はアノマリー学習を使用する。"""
 

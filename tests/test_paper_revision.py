@@ -1,5 +1,5 @@
 # テスト: 生成器構造・偏差の扱い・チェックポイント互換性が期待どおりに動くかを自動検査する。
-"""Paper architecture, unit conversion, augmentation and checkpoint contracts."""
+"""論文の構造・単位変換・データ拡張・チェックポイントの整合性を検査する。"""
 # ── 使用するライブラリ・共通処理 ──────────────────
 import pytest
 import torch
@@ -15,7 +15,7 @@ from src.utils.checkpoint import MODEL_FORMAT, load_generator_state, require_mod
 def test_tables_and_scalar_discriminator():
     average = AnomalyInpaintingGenerator()
     encoder = average.encoder_decoder
-    assert isinstance(encoder.e10, ReflectionConv2d)  # no final ELU
+    assert isinstance(encoder.e10, ReflectionConv2d)  # 最終層にはELUを置かない。
     decoder_convs = [m for name,module in encoder.named_children() if name.startswith('d')
                      for m in module.modules() if isinstance(m,nn.Conv2d)]
     assert [m.out_channels for m in decoder_convs] == [128,128,64,64,32,32,16,16,1]

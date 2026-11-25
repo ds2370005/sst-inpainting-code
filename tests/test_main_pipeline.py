@@ -1,5 +1,5 @@
 # テスト: メイン処理の段階実行・引数・出力管理が期待どおりに動くかを自動検査する。
-"""Orchestrator tests with fake children: no downloads or real training."""
+"""子プロセスを模擬し、取得や実学習なしでメイン処理を検査する。"""
 
 # ── 使用するライブラリ・共通処理 ──────────────────
 from src.utils.checkpoint import MODEL_FORMAT

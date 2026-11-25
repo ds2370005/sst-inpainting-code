@@ -7,7 +7,7 @@ from src.models.generator import EncoderDecoder2D, _assert_volume_tensor, _asser
 
 # ── 処理に使用する関数・クラス ──────────────────
 class AverageEstimationGenerator(nn.Module):  # ネットワーク定義: 月平均と時系列SSTから週平均SSTを推定する
-    """Estimate a cloud-free weekly average SST image."""
+    """雲による欠損のない週平均SST画像を推定する。"""
 
     def __init__(self, time_steps: int = 9) -> None:
         super().__init__()
@@ -15,7 +15,7 @@ class AverageEstimationGenerator(nn.Module):  # ネットワーク定義: 月平
         self.time_steps = time_steps
         self.sst_projection = nn.Conv3d(2, 1, kernel_size=1)
         self.monthly_projection = nn.Conv3d(2, 1, kernel_size=1)
-        # Fig. 8: concatenate nine temporal features and one monthly feature.
+        # 図8：9時刻の特徴と月平均の特徴1枚を結合する。
         self.encoder_decoder = EncoderDecoder2D(in_channels=time_steps + 1)
 
     def forward(

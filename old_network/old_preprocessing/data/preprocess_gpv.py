@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # 旧実装・旧テスト: GPVアーカイブから表層水温を抽出し、日別・週平均と学習用パッチを保存する。
-"""Extract JMA Psbs FD01 1m daily forecasts and trailing seven-day means.
+"""気象庁Psbs・FD01・水深1mの日平均予報と過去7日平均を抽出する。
 
-Only numpy and eccodes are required. No network access. See README_GPV.md.
-"""
+必要なのはnumpyとeccodes。通信は行わない。README_GPV.mdを参照。"""
 from __future__ import annotations
 
 # ── 使用するライブラリ・共通処理 ──────────────────
@@ -39,7 +38,7 @@ def atomic_npz(path, **fields):
 
 
 def read_field(path, ec, initial):
-    """Multi-field GRIB support: search actual parameter and depth, not order."""
+    """複数フィールドのGRIBに対応し、格納順ではなく実際の変数と水深で検索する。"""
     ec.codes_grib_multi_support_on()
     with path.open("rb") as f:
         while True:
@@ -59,7 +58,7 @@ def read_field(path, ec, initial):
                 stamp = datetime.strptime(
                     f"{int(get('dataDate')):08d}{int(get('dataTime')):04d}",
                     "%Y%m%d%H%M").replace(tzinfo=timezone.utc)
-                # Request hours explicitly; ecCodes step keys otherwise depend on units.
+                # ecCodesの時間ステップ情報は単位に依存するため、時間単位を明示的に指定する。
                 ec.codes_set(gid, "stepUnits", 1)
                 if (stamp != initial or get("stepType") != "avg"
                         or float(get("startStep")) != 0 or float(get("endStep")) != 24):
@@ -72,7 +71,7 @@ def read_field(path, ec, initial):
                 if get("gridType") != "regular_ll":
                     raise ValueError("Only regular latitude/longitude grids are supported")
                 ny, nx = int(get("Nj")), int(get("Ni"))
-                # Validate scan layout using coordinates rather than assuming reshape order.
+                # 配列の並べ替え順を仮定せず、座標で走査順序を検証する。
                 lat2 = np.asarray(ec.codes_get_array(gid, "latitudes")).reshape(ny, nx)
                 lon2 = np.asarray(ec.codes_get_array(gid, "longitudes")).reshape(ny, nx)
                 if not (np.allclose(lat2, lat2[:, :1]) and np.allclose(lon2, lon2[:1, :])):
@@ -99,7 +98,7 @@ def extract(archive, scratch, ec, initial):
     with tarfile.open(archive, "r|gz") as tar:
         for member in tar:
             if member.isfile() and member.name.endswith(SUFFIX):
-                # Copy only the required member; never use its name as a local path.
+                # 必要なアーカイブ要素だけをコピーし、格納名をそのままローカルパスに使わない。
                 with tar.extractfile(member) as source, scratch.open("wb") as out:
                     shutil.copyfileobj(source, out, length=1024 * 1024)
                 sst, lat, lon, meta = read_field(scratch, ec, initial)
@@ -228,7 +227,7 @@ def main(argv=None):
         import eccodes as ec
     except ImportError:
         p.error("Install dependencies: python3 -m pip install numpy eccodes")
-    # A fresh output directory prevents stale products and mixed preprocessing settings.
+    # 新しい出力先を使い、古いデータの残留や前処理設定の混在を防ぐ。
     if args.output.exists() and any(args.output.iterdir()):
         p.error("Output directory must be empty; choose a new directory")
     args.output.mkdir(parents=True, exist_ok=True)

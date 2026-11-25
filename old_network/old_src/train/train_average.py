@@ -1,5 +1,5 @@
 # 旧実装・旧テスト: 旧平均推定生成器と識別器を学習し、ログとチェックポイントを保存する。
-"""Train the average-estimation network on Himawari or synthetic data."""
+"""ひまわりデータまたは合成データで旧平均推定ネットワークを学習する。"""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ from src.utils.checkpoint import MODEL_FORMAT, load_generator_state
 
 # ── 処理に使用する関数・クラス ──────────────────
 class SyntheticAverageDataset(Dataset[dict[str, torch.Tensor]]):  # 学習処理: 形状確認用の平均推定サンプルを乱数で作る
-    """Random tensors with the same shapes as average-estimation batches."""
+    """平均推定学習バッチと同じ形状の乱数テンソルを作る。"""
 
     def __init__(
         self,

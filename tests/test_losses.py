@@ -1,5 +1,5 @@
 # テスト: 再構成損失と敵対的損失の計算が期待どおりに動くかを自動検査する。
-"""Tests for adversarial and reconstruction losses."""
+"""敵対的損失と再構成損失を検査する。"""
 
 # ── 使用するライブラリ・共通処理 ──────────────────
 import torch
