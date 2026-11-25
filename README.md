@@ -103,7 +103,9 @@
 │   ├── himawaridata/               # 既存の取得・前処理関連コード
 │   └── gcomc/                      # GCOM-C関連コード（新方式では使用しない）
 ├── visualize/                      # 画像・ヒストグラム・損失曲線・評価補助
-├── tests/                          # 合成データ等の自動テスト
+├── tests/                          # 現方式・共通機能・全域拡張の自動テスト
+├── old_network/                    # 旧データ形式・平均推定・局所PatchGANのテスト
+├── pytest.ini                      # 通常のテスト対象をtests/に限定
 ├── docs/                           # 設計・実験履歴。旧方式の説明も含む
 ├── olds/                           # 旧実装
 ├── data/                           # ローカルデータ用。サーバーは外部パスを指定
@@ -287,3 +289,24 @@ OMP_NUM_THREADS=1 python3 -m pytest -q tests/test_temporal_baseline.py tests/tes
 参考論文：Hirahara et al., *Cloud-Free Sea-Surface-Temperature Image Reconstruction From Anomaly Inpainting Network*, IEEE TGRS, DOI: [10.1109/TGRS.2021.3111649](https://doi.org/10.1109/TGRS.2021.3111649)。
 
 生成器・全体識別器は論文の表I～IIIを参考にしています。現在の観測9時刻平均＋最近傍補間、追加人工雲を使用しない学習、データ期間・データ製品は原著の設定とは異なります。旧方式や変更履歴は`docs/paper_revision.md`、`docs/hirahara_global_gan.md`を参照してください。
+
+### 現行テストと旧方式テストの分離
+
+通常の `python3 -m pytest -q` は `pytest.ini` により `tests/` のみ実行します。
+`tests/` は最近傍基準のアノマリー学習、共通ネットワーク・損失、JCOPE、取得データの前処理、可視化、実行管理を対象とします。
+全域方式は新方式の拡張なので `test_full_domain_temporal.py` もここに残しています。
+互換性の拒否チェックや実行管理の旧経路確認は、現行コードの安全性を確かめるため一部残しています。
+
+`old_network/` には旧形式ローダー・旧前処理・平均推定学習・追加人工雲・局所PatchGANのテストを移しました。
+新旧混在ファイルから局所識別と平均推定専用のテストを分離しています。
+このフォルダは旧テストの保管先であり、モデル本体の独立したコピーではありません。
+実装の `src/` と既存の `olds/`、学習済み重み・データは移動していません。
+
+```bash
+# 現方式と共通機能
+OMP_NUM_THREADS=1 python3 -m pytest -q
+# 旧方式を明示的に検査
+OMP_NUM_THREADS=1 python3 -m pytest -q old_network
+# 両方を検査
+OMP_NUM_THREADS=1 python3 -m pytest -q tests old_network
+```

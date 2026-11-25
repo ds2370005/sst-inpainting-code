@@ -8,7 +8,7 @@ from src.models.discriminator import build_discriminator, Discriminator
 
 
 def test_default_uses_single_discriminator_and_paper_losses():
-    config = yaml.safe_load((Path(__file__).parents[1] / 'config.yaml').read_text())
+    config = yaml.safe_load((Path(__file__).parents[1] / 'config_temporal_mean_patch.yaml').read_text())
     loss = config['loss']
     assert 'physical_alpha' not in loss
     assert 'physical_beta' not in loss
