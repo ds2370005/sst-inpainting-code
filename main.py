@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
+# 役割: 設定に従って前処理・学習・復元を順に実行し、ログと実行時間を保存する。
 """Manage preprocessing, two-stage training, and patch reconstruction in one run."""
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 import csv
 import time
@@ -21,6 +23,7 @@ ROOT = Path(__file__).resolve().parent
 STAGES = ('preprocess', 'average', 'anomaly', 'reconstruct')
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', type=Path, default=ROOT / 'config.yaml')
@@ -338,5 +341,6 @@ def main(argv=None):
     return 0
 
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__ == '__main__':
     raise SystemExit(main())

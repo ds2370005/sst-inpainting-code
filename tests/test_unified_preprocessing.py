@@ -1,4 +1,6 @@
+# テスト: 統合前処理・格子合わせ・索引と学習データ読み込みが期待どおりに動くかを自動検査する。
 """Small NetCDF + mocked GRIB extraction tests; never contact external servers."""
+# ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime,timedelta
 from types import SimpleNamespace
 import json
@@ -15,6 +17,7 @@ from src.preprocessing.pipeline import run
 from src.datasets.unified_dataset import UnifiedSSTDataset,create_unified_loader
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def test_bilinear_coordinates_and_coast():
     values=np.array([[20.,22.],[10.,12.]])
     lat=np.array([2.,1.]);lon=np.array([10.,12.])

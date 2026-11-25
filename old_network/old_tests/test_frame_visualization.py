@@ -1,4 +1,6 @@
+# 旧実装・旧テスト: 旧時系列可視化の時刻選択と欠落検出が期待どおりに動くかを自動検査する。
 """Visualization uses exact observation times without training-only filtering."""
+# ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -8,6 +10,7 @@ import pytest
 from old_network.old_visualize.frame_visualization import load_sequence
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def frames(root):
     folder=root/'frames/himawari'
     folder.mkdir(parents=True)

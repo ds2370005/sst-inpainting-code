@@ -1,7 +1,9 @@
+# 旧実装・旧テスト: 旧索引形式の配列から平均推定学習用サンプルを読み込む。
 """Average-estimation dataset interfaces."""
 
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 from pathlib import Path
 from typing import Any
 
@@ -27,6 +29,7 @@ AVERAGE_FIELDS = (
 )
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 class AverageDataset(Dataset[dict[str, torch.Tensor]]):  # データローダー: indexファイルから平均推定用の学習サンプルを読む
     """Dataset backed by an index file of preprocessed tensor field paths."""
 

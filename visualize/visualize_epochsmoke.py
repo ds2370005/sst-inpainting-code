@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# 役割: 保存済みの入力・基準SST・偏差・復元結果を比較図として可視化する。
 """Plot a smoke-run patch preview (one training batch, not accuracy evaluation).
 
 Example:
@@ -6,6 +7,7 @@ Example:
 """
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 import json
 from datetime import datetime, timedelta
@@ -20,6 +22,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def plane(values, name):
     """Select the first batch/channel from a reconstructed field."""
     values = np.asarray(values)
@@ -288,5 +291,6 @@ def main():
         parser.exit(1, f"Error: {exc}\n")
 
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__ == "__main__":
     main()

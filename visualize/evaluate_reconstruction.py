@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
+# 役割: 復元SSTと参照値の誤差を集計し、散布図や任意の閾値によるROC・PR曲線を出力する。
 """Regression diagnostics; optional temperature-threshold ROC/PR classification.
 
 By default compare reconstruction with observed input pixels, NOT hidden truth.
 External truth NPZ: sst_celsius and valid_mask on exactly the prediction grid.
 """
 from __future__ import annotations
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 import csv
 import json
@@ -18,6 +20,7 @@ import numpy as np
 import yaml
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def regression_metrics(truth, prediction):
     error = prediction - truth
     denominator = np.sum((truth-truth.mean())**2)
@@ -213,4 +216,5 @@ def main():
     except (OSError,ValueError,KeyError) as exc:parser.exit(1,f'Error: {exc}\n')
 
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__=='__main__':main()

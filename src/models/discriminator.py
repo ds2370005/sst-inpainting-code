@@ -1,12 +1,15 @@
+# 役割: 256×256のSST全体を識別するネットワークを定義し、設定に応じた識別器を作る。
 """Table III discriminator: six stride-2 layers, then a 4x4 scalar head.
 
 Returns logits. The loss applies log-sigmoid stably.
 The paper's training patch size is 256x256; other sizes are rejected.
 """
+# ── 使用するライブラリ・共通処理 ──────────────────
 import torch
 from torch import nn
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 class Discriminator(nn.Module):
     def __init__(self, in_channels: int = 1):
         super().__init__()

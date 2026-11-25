@@ -1,3 +1,4 @@
+# 旧実装・旧テスト: ひまわりの対象海域を切り出し、固定グリッドのパッチと時間平均を保存する。
 """Create single-observation SST patches (default) or legacy nine-frame volumes.
 
 Default output: frames/himawari/*.npz and separate averages/himawari/*.npz.
@@ -27,6 +28,7 @@ sea surface temperature retrieval", for the cloud-screening method.
 
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 import csv
 import re
@@ -56,6 +58,7 @@ KELVIN_TO_CELSIUS_OFFSET = 273.15
 TIMESTAMP_PATTERN = re.compile(r"^(\d{14})-")
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def find_contiguous_slice(
     values: np.ndarray,
     lower: float,
@@ -1038,5 +1041,6 @@ def main() -> None:
     print(f"Created {count} aligned training patches in {args.output}")
 
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__ == "__main__":
     main()

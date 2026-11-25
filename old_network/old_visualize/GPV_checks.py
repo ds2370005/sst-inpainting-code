@@ -1,3 +1,4 @@
+# 旧実装・旧テスト: GPVアーカイブ内のGRIB水温を確認するシェル貼り付け用コード（Python単体実行用ではない）。
 python3 - <<'PY'
 from pathlib import Path
 import tarfile

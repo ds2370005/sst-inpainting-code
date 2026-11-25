@@ -1,10 +1,13 @@
+# 役割: 有効画素の再構成誤差と、各学習段階で使用する損失係数を定義する。
 """Masked reconstruction losses."""
 
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import torch
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def masked_mse_loss(
     pred: torch.Tensor,
     target: torch.Tensor,

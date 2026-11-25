@@ -1,4 +1,6 @@
+# テスト: 生成器構造・偏差の扱い・チェックポイント互換性が期待どおりに動くかを自動検査する。
 """Paper architecture, unit conversion, augmentation and checkpoint contracts."""
+# ── 使用するライブラリ・共通処理 ──────────────────
 import pytest
 import torch
 from torch import nn
@@ -9,6 +11,7 @@ from src.train.train_anomaly import apply_random_cloud_mask
 from src.utils.checkpoint import MODEL_FORMAT, load_generator_state, require_model_format
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def test_tables_and_scalar_discriminator():
     average = AnomalyInpaintingGenerator()
     encoder = average.encoder_decoder

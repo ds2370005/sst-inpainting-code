@@ -1,3 +1,5 @@
+# テスト: JCOPEの期間選択・格子合わせ・欠損処理が期待どおりに動くかを自動検査する。
+# ── 使用するライブラリ・共通処理 ──────────────────
 from pathlib import Path
 import numpy as np
 import pytest
@@ -5,6 +7,7 @@ from netCDF4 import Dataset
 from src.preprocessing.JCOPE_preprocessing import align
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def fixture_files(root):
     raw=root/'raw';raw.mkdir();grid=root/'grid';grid.mkdir()
     np.save(grid/'lat.npy',[2.,1.5,1.,0.])

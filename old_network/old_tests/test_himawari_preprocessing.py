@@ -1,5 +1,7 @@
+# 旧実装・旧テスト: 旧ひまわりの固定パッチ切り出し・雲マスク・時間平均が期待どおりに動くかを自動検査する。
 """Focused tests for bulk Himawari patch preprocessing helpers."""
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -21,6 +23,7 @@ from old_network.old_preprocessing.himawaridata.crop_nc_to_1650 import (
 )
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def test_fixed_grid_is_centered_and_nonoverlapping() -> None:
     grid = build_fixed_grid(slice(100, 1750), slice(200, 1850), 256)
 

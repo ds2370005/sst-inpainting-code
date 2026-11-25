@@ -1,4 +1,6 @@
+# 役割: 全域の9時刻平均と最近傍補間を基準に、アノマリー生成器で全域SSTを復元する。
 """9時刻全域平均＋最近傍基準を使い、アノマリー生成器で全域を一括復元。"""
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 from pathlib import Path
 import json
@@ -15,6 +17,7 @@ from src.utils.normalization import anomaly_to_sst_scale
 from src.infer.reconstruct import resolve_device
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def predict_full(model, sst, mask, baseline):
     """8の倍数へ右・下だけ反射拡張し、推論後に元の座標範囲へ戻す。"""
     h,w=sst.shape[-2:]
@@ -95,4 +98,5 @@ def main():
     run(config,a.data_root,a.target_time,a.output,a.anomaly_checkpoint,a.device or config['training']['device'],a.baseline_only)
 
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__=='__main__':main()

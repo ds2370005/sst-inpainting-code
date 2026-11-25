@@ -1,3 +1,5 @@
+# テスト: 現行設定の基準SST方式・識別器・損失係数が期待どおりに動くかを自動検査する。
+# ── 使用するライブラリ・共通処理 ──────────────────
 from pathlib import Path
 
 import torch
@@ -7,6 +9,7 @@ from src.losses import loss_weights, reconstruction_loss, generator_adversarial_
 from src.models.discriminator import build_discriminator, Discriminator
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def test_default_uses_single_discriminator_and_paper_losses():
     config = yaml.safe_load((Path(__file__).parents[1] / 'config_temporal_mean_patch.yaml').read_text())
     loss = config['loss']

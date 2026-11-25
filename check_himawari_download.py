@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+# 役割: 保存済みひまわりデータの時刻欠落とファイルの読み出し状態を確認する。
 """Read-only local hourly SST audit; no FTP access or data modification."""
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 import calendar
 import csv
@@ -9,6 +11,7 @@ from pathlib import Path
 from download_himawari_sst import FILE_PATTERN
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def audit(root, start, end, output, deep=False):
     reader = None
     if deep:
@@ -102,6 +105,7 @@ def audit(root, start, end, output, deep=False):
     return 1 if issues else 0
 
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__ == '__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root',type=Path,required=True)

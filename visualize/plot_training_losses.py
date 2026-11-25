@@ -1,4 +1,6 @@
+# 役割: 保存された学習ログからエポックごとの損失曲線と集計表を作る。
 """Plot training-only epoch losses from main.py's saved logs."""
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 import csv
 import math
@@ -13,6 +15,7 @@ KEYS = ('loss_d', 'loss_g', 'loss_rec', 'loss_adv')
 PATTERN = re.compile(r'epoch=(\d+)/(\d+)\s+' + r'\s+'.join(k + r'=(\S+)' for k in KEYS))
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def plot(run_dir, output_dir=None):
     output_dir = output_dir or run_dir / 'loss_curves'
     stages = {}
@@ -51,6 +54,7 @@ def plot(run_dir, output_dir=None):
     plt.close(fig)
 
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--run-dir', type=Path, required=True)

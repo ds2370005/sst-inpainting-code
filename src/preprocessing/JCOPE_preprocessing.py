@@ -1,4 +1,6 @@
+# 役割: JCOPEの毎時表層水温を、ひまわりと同じ緯度経度格子へバイリニア補間する。
 """JCOPE-Tの毎時表層水温をひまわり座標へバイリニア補間する。"""
+# ── 使用するライブラリ・共通処理 ──────────────────
 from pathlib import Path
 from datetime import datetime, timedelta
 import argparse
@@ -9,6 +11,7 @@ from .common import save_frame, write_json
 from .interpolation import bilinear
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def align(input_root, satellite_root, output, start=None, end=None, max_frames=None):
     """日付の両端を含む。原本は変更せず、水温は1時間分ずつ読み込む。"""
     input_root, satellite_root, output = map(Path, (input_root, satellite_root, output))
@@ -124,4 +127,5 @@ def main():
     a=p.parse_args()
     align(a.input,a.satellite_root,a.output,a.start,a.end,a.max_frames)
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__=='__main__': main()

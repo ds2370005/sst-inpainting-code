@@ -1,4 +1,6 @@
+# テスト: マスク付きL2損失と毎時データ同化プールの時間処理が期待どおりに動くかを自動検査する。
 """Formula, gradients and hourly chronology; no network or real training data."""
+# ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime, timedelta
 import json
 import numpy as np
@@ -11,6 +13,7 @@ from src.preprocessing.hourly_assimilation import prepare
 
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def test_l2_is_per_image_norm_and_ignores_missing():
     pred=torch.tensor([[[[3.,4.,1.]]],[[[0.,0.,0.]]]],requires_grad=True)
     target=torch.tensor([[[[0.,0.,float('nan')]]],[[[0.,0.,0.]]]])

@@ -1,3 +1,5 @@
+# テスト: 全域9時刻入力と最近傍基準による復元が期待どおりに動くかを自動検査する。
+# ── 使用するライブラリ・共通処理 ──────────────────
 import json
 import numpy as np
 import pytest
@@ -6,6 +8,7 @@ from src.preprocessing.full_domain_input import load_full_frames, paths_for_time
 from src.infer.full_domain import run, predict_full
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def fixture_domain(tmp_path):
     from datetime import datetime, timedelta
     rows=[]

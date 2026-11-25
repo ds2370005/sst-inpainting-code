@@ -1,7 +1,9 @@
+# 役割: 保存済み重みと入力パッチから基準SST・偏差・復元SSTを出力する。
 """Run two-stage SST reconstruction from preprocessed array inputs."""
 
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 from pathlib import Path
 from typing import Any
@@ -24,6 +26,7 @@ REQUIRED_INPUT_KEYS = (
 )
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def resolve_device(requested_device: str) -> torch.device:  # 推論処理: CUDAが使えればGPU、無理ならCPUを返す
     if requested_device == "cuda" and not torch.cuda.is_available():
         print("CUDA requested but unavailable; falling back to CPU.")
@@ -157,5 +160,6 @@ def main() -> None:  # 推論処理: CLIから再構成を実行する入口
     )
 
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__ == "__main__":
     main()

@@ -1,6 +1,8 @@
+# 旧実装・旧テスト: 各観測時刻のパッチを個別に保存し、時系列組み立て用のデータを作る。
 """Store each observation/grid patch once; build temporal volumes in the loader."""
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 from pathlib import Path
 
 import numpy as np
@@ -14,6 +16,7 @@ from old_network.old_preprocessing.himawaridata.crop_nc_to_1650 import (
 )
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def atomic_save_npz(path: Path, **fields) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp")

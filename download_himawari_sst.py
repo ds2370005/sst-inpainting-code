@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# 役割: 指定期間のひまわりSSTをFTPから取得し、再試行と取得済みファイルのスキップを行う。
 """Download hourly P-Tree L3C SST files using only the standard library.
 
 Credentials: PTREE_FTP_USER / PTREE_FTP_PASSWORD or --user / --password.
@@ -10,6 +11,7 @@ skips existing nonempty final files; interrupted .tmp files restart from zero.
 Run only one instance per output directory. FTP sends credentials unencrypted.
 """
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 import calendar
 from datetime import datetime
@@ -32,6 +34,7 @@ FILE_PATTERN = re.compile(
 LOG = logging.getLogger("himawari_sst")
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 class LocalWriteError(Exception):
     """A local disk error must not be retried as a network failure."""
 
@@ -260,5 +263,6 @@ def main(argv=None):
         return 1
 
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__ == "__main__":
     sys.exit(main())

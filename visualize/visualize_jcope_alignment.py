@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+# 役割: 格子合わせ後のJCOPE水温・有効画素マスク・統計を可視化する。
 """補間後JCOPEの水温・欠損マスク・統計を確認する。学習結果の評価ではない。"""
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 import json
 from pathlib import Path
@@ -10,6 +12,7 @@ from matplotlib.colors import ListedColormap
 import numpy as np
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def edges(axis):
     """格子中心から描画用の境界を求める。昇順・降順の両方に対応。"""
     axis=np.asarray(axis,dtype=float)
@@ -84,4 +87,5 @@ def main():
     p.add_argument('--dpi',type=int,default=150)
     a=p.parse_args();visualize(a.input,a.output,a.max_frames,a.start_index,a.vmin,a.vmax,a.cmap,a.dpi)
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__=='__main__':main()

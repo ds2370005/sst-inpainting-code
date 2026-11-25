@@ -1,5 +1,7 @@
+# 旧実装・旧テスト: GPVのPsbs・FD01・水深1mを抽出し、衛星格子に揃えた日別・週平均を保存する。
 """JMA GPV extraction and alignment; independent of satellite preprocessing."""
 from __future__ import annotations
+# ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from collections import deque
@@ -12,6 +14,7 @@ from src.preprocessing.common import save_frame, read_array
 SUFFIX = "_Lz1-1000_Psbs_FD01_grib2.bin"
 ARCHIVE = re.compile(r"Z__C_RJTD_(\d{14})_OCN_GPV_Rjp_Gll2km_grib2.tar.gz$")
 
+# ── 処理に使用する関数・クラス ──────────────────
 def read_field(path, ec, initial):
     """Multi-field GRIB support: search actual parameter and depth, not order."""
     ec.codes_grib_multi_support_on()

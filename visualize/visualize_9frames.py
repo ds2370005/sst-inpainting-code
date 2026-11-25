@@ -1,3 +1,4 @@
+# 役割: 1時刻1NPZ形式の同一区画から、9時刻のSSTを並べて表示する。
 """1時刻1NPZから同一区画のSSTを時系列表示（標準: 6時間間隔で9枚）。
 
 python test/visualize_9frames.py --data-root /path/to/frames256
@@ -7,6 +8,7 @@ python test/visualize_9frames.py --data-root /path/to/frames256 --target 2025040
 平均NPZは不要。単一観測は--time-steps 1。出力はoutputs/。
 色範囲は有効SSTの2〜98パーセンタイル（--vmin/--vmaxで変更可能）。
 """
+# ── 使用するライブラリ・共通処理 ──────────────────
 from pathlib import Path
 import sys
 
@@ -20,5 +22,6 @@ from frame_visualization import main
 DEFAULT_DATA_ROOT = ROOT/'data/frames256'
 DEFAULT_CONFIG = ROOT/'config.yaml'
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__ == '__main__':
     main('sst',DEFAULT_DATA_ROOT,DEFAULT_CONFIG)

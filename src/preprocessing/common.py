@@ -1,4 +1,6 @@
+# 役割: 前処理で共有する配列・JSONの保存と読み込み、パッチ位置選択の補助処理を提供する。
 """Shared disk format: full-region memory-mapped arrays, not fixed patches."""
+# ── 使用するライブラリ・共通処理 ──────────────────
 from pathlib import Path
 import json
 import os
@@ -8,6 +10,7 @@ import numpy as np
 FORMAT_VERSION = 3
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def write_json(path, value):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)

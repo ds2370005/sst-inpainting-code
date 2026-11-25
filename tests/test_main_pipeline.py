@@ -1,5 +1,7 @@
+# テスト: メイン処理の段階実行・引数・出力管理が期待どおりに動くかを自動検査する。
 """Orchestrator tests with fake children: no downloads or real training."""
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 from src.utils.checkpoint import MODEL_FORMAT
 import importlib.util
 import csv
@@ -16,6 +18,7 @@ runner = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(runner)
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 @pytest.fixture
 def setup(tmp_path, monkeypatch):
     config = dict(seed=42, data=dict(patch_size=2,time_steps=3,min_temp=0,max_temp=35),

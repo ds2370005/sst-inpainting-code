@@ -1,11 +1,14 @@
+# 役割: 偏差の正規化値をSSTの正規化尺度へ変換する倍率を計算する。
 """Shared unit conversions for training and reconstruction."""
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import math
 from collections.abc import Mapping
 from typing import Any
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def anomaly_to_sst_scale(data: Mapping[str, Any]) -> float:
     """Convert a unit anomaly output to the normalized SST difference.
 

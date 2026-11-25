@@ -1,7 +1,9 @@
+# 役割: 基準SSTに対する偏差生成器と識別器を学習し、損失ログと重みを保存する。
 """Train the anomaly-inpainting network on Himawari or synthetic data."""
 
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 import math
 import random
@@ -30,6 +32,7 @@ from src.utils.normalization import anomaly_to_sst_scale
 from src.models.temporal_baseline import temporal_mean_nearest
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 class SyntheticAnomalyDataset(Dataset[dict[str, torch.Tensor]]):  # 学習処理: 形状確認用の異常補完サンプルを乱数で作る
     """Random tensors with the same shapes as anomaly-inpainting batches."""
 
@@ -213,6 +216,7 @@ def train_one_epoch(
     max_batches: int | None = None,
     average_generator: AverageEstimationGenerator | None = None,
 ) -> dict[str, float]:  # 学習処理: 生成器と識別器を交互に1エポック更新する
+    # 生成器と識別器を学習モードにする。旧平均推定器を使う場合はその重みを固定する。
     generator.train()
     discriminator.train()
     if average_generator is not None:
@@ -220,6 +224,7 @@ def train_one_epoch(
         average_generator.eval()
 
     loss_config = config["loss"]
+    # 設定から再構成損失と敵対的損失の重みを取得する。
     lambda_rec, lambda_adv = loss_weights(loss_config, "ano")
     beta = float(loss_config.get("physical_beta", 0.5))
     rec_loss = lambda p, t, m: reconstruction_loss(p, t, m, loss_config)
@@ -243,6 +248,7 @@ def train_one_epoch(
         if max_batches is not None and batch_index >= max_batches:
             break
 
+        # データローダーが作った1バッチを、指定されたCPUまたはGPUへ移す。
         batch = move_batch_to_device(raw_batch, device)
         if data_config.get("baseline_method", "learned") == "temporal_mean_nearest":
             # 9時刻それぞれの観測マスクを保持し、追加遮蔽しない。
@@ -258,6 +264,7 @@ def train_one_epoch(
                 show = log_interval > 0 and (batch_index == 0 or (batch_index + 1) % log_interval == 0)
                 total_batches = min(len(loader), max_batches) if max_batches is not None else len(loader)
                 prefix = f"[基準SST batch={batch_index+1}/{total_batches}]" if show else None
+                # 現方式の基準画像：9時刻の観測平均を作り、残る欠損を最近傍補間する。
                 weekly_average = temporal_mean_nearest(masked_sst, masked_valid, log_prefix=prefix)["baseline"]
         elif average_generator is None:
             # Retained for isolated synthetic tests; real CLI requires stage one.
@@ -269,6 +276,7 @@ def train_one_epoch(
                     batch["monthly_average"], batch["monthly_mask"],
                 )
             weekly_average = weekly_average.detach()
+        # 変数名はweekly_averageだが、現方式では9時刻平均＋補間で作った短期基準SSTを表す。
         weekly_average_5d = weekly_average.unsqueeze(2)
         target_sst = batch["target_sst"]
         target_mask = batch["target_mask"]
@@ -278,9 +286,11 @@ def train_one_epoch(
                 masked_valid,
                 weekly_average_5d,
             )
+            # 予測偏差をSSTと同じ正規化尺度へ戻し、基準SSTに足して復元する。
             pred_sst = weekly_average + pred_anomaly * anomaly_scale
         use_adversarial = "assimilation_sst" in batch and lambda_adv > 0.0
         if use_adversarial:
+            # 識別器の更新：実データ同化SSTと生成SSTを識別する。detachで生成器への逆伝播を止める。
             optimizer_d.zero_grad(set_to_none=True)
             with autocast_context():
                 real_logits = discriminator(batch["assimilation_sst"])
@@ -292,21 +302,25 @@ def train_one_epoch(
             loss_d = pred_sst.new_zeros(())
 
         if use_adversarial:
+            # 生成器の更新中は識別器の重みを固定するが、識別結果から生成器への勾配は流す。
             set_requires_grad(discriminator, False)
         optimizer_g.zero_grad(set_to_none=True)
         with autocast_context():
+            # 観測できた対象時刻の画素だけで、復元SSTの再構成誤差を計算する。
             loss_rec = rec_loss(pred_sst, target_sst, target_mask)
             if use_adversarial:
                 fake_logits_for_g = discriminator(pred_sst)
                 loss_adv = generator_adversarial_loss(fake_logits_for_g, beta)
             else:
                 loss_adv = pred_sst.new_zeros(())
+            # 再構成誤差と敵対的損失を重み付きで合計し、生成器を更新する。
             loss_g = lambda_rec * loss_rec + lambda_adv * loss_adv
         loss_g.backward()
         optimizer_g.step()
         if use_adversarial:
             set_requires_grad(discriminator, True)
 
+        # バッチごとの損失を蓄積し、エポック終了時に平均値としてログへ渡す。
         total_d += float(loss_d.detach().cpu())
         total_g += float(loss_g.detach().cpu())
         total_rec += float(loss_rec.detach().cpu())
@@ -481,5 +495,6 @@ def main() -> None:  # 学習処理: 実データまたはsyntheticで異常補�
         )
 
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__ == "__main__":
     main()

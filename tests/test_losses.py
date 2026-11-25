@@ -1,5 +1,7 @@
+# テスト: 再構成損失と敵対的損失の計算が期待どおりに動くかを自動検査する。
 """Tests for adversarial and reconstruction losses."""
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import torch
 import torch.nn.functional as F
 
@@ -10,6 +12,7 @@ from src.losses import (
 )
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def test_masked_mse_loss_matches_manual_value() -> None:
     pred = torch.tensor([[[[1.0, 3.0], [5.0, 7.0]]]])
     target = torch.tensor([[[[0.0, 1.0], [2.0, 3.0]]]])

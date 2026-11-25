@@ -1,7 +1,9 @@
+# 旧実装・旧テスト: 旧NPZ形式のひまわりパッチを読み込み、マスク・平均・正規化を学習入力にまとめる。
 """Datasets backed directly by NPZ files from Himawari preprocessing."""
 
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 from pathlib import Path
 from typing import Literal
 
@@ -12,6 +14,7 @@ from torch.utils.data import Dataset
 from old_network.old_preprocessing.datasets.frame_index import build_frame_index, load_temporal_sample
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def normalize_sst(array: np.ndarray, min_temp: float, max_temp: float) -> np.ndarray:
     if not max_temp > min_temp:
         raise ValueError("max_temp must be greater than min_temp.")

@@ -1,5 +1,7 @@
+# 旧実装・旧テスト: 旧NPZ学習入力のマスク生成と正規化が期待どおりに動くかを自動検査する。
 """Tests for direct training from preprocessed Himawari NPZ samples."""
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 from pathlib import Path
 
 import numpy as np
@@ -9,6 +11,7 @@ from old_network.old_preprocessing.datasets.himawari_patch_dataset import Himawa
 from src.losses import masked_mse_loss
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def _write_sample(path: Path) -> None:
     sst = np.full((1, 2, 2, 2), 17.5, dtype=np.float32)
     cloud = np.zeros_like(sst, dtype=np.uint8)

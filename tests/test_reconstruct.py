@@ -1,5 +1,7 @@
+# テスト: 保存済み入力と重みを使用した復元処理が期待どおりに動くかを自動検査する。
 """Tests for the reconstruction inference pipeline."""
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 from src.utils.checkpoint import MODEL_FORMAT
 
 from pathlib import Path
@@ -11,6 +13,7 @@ from src.infer.reconstruct import run_reconstruction
 from src.models import AnomalyInpaintingGenerator, AverageEstimationGenerator
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def _config(patch_size: int = 160, time_steps: int = 9) -> dict:
     return {
         "data": {

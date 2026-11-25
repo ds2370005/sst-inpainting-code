@@ -1,8 +1,11 @@
+# テスト: 9時刻平均・最近傍補間・基準SSTの学習と推論での扱いが期待どおりに動くかを自動検査する。
+# ── 使用するライブラリ・共通処理 ──────────────────
 import pytest
 import torch
 from src.models.temporal_baseline import temporal_mean_nearest
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def test_mean_and_nearest_preserve_observations():
     s = torch.full((1,1,9,3,3), float('nan'))
     m = torch.zeros_like(s)

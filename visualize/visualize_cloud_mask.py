@@ -1,3 +1,4 @@
+# 役割: 1時刻1NPZ形式の同一区画から、時系列の雲マスクを並べて表示する。
 """1時刻1NPZから同一区画の雲マスクを時系列表示。
 
 python test/visualize_cloud_mask.py --data-root /path/to/frames256
@@ -7,6 +8,7 @@ SST可視化と同じ--data-root/--target/--configで同じ観測列を表示す
 黒=1（雲・欠損海域）、白=0（晴天海域または陸地）。平均NPZは不要。
 --time-steps 1で単一観測、--outputで保存先を指定可能。
 """
+# ── 使用するライブラリ・共通処理 ──────────────────
 from pathlib import Path
 import sys
 
@@ -19,5 +21,6 @@ from frame_visualization import main
 DEFAULT_DATA_ROOT = ROOT/'data/frames256'
 DEFAULT_CONFIG = ROOT/'config.yaml'
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__ == '__main__':
     main('mask',DEFAULT_DATA_ROOT,DEFAULT_CONFIG)

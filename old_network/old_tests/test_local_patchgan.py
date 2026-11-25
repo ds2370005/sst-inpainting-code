@@ -1,4 +1,6 @@
+# 旧実装・旧テスト: 旧global/local識別器の損失計算と勾配伝播が期待どおりに動くかを自動検査する。
 """Formula, gradients and hourly chronology; no network or real training data."""
+# ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime, timedelta
 import json
 import numpy as np
@@ -9,6 +11,7 @@ from src.models.discriminator import PhysicalModelDiscriminator
 from src.preprocessing.hourly_assimilation import prepare
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def test_weighted_minimax_matches_probabilities_and_gradients():
     fake={'global':torch.tensor([[.2],[-.3]],requires_grad=True),
           'local':torch.tensor([[[[.1,-.4]]],[[[.8,.3]]]],requires_grad=True)}

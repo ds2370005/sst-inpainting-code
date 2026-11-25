@@ -1,3 +1,5 @@
+# テスト: SST比較ヒストグラムの集計と出力が期待どおりに動くかを自動検査する。
+# ── 使用するライブラリ・共通処理 ──────────────────
 import importlib.util
 from pathlib import Path
 import json
@@ -10,6 +12,7 @@ hist=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(hist)
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 @pytest.fixture
 def run(tmp_path):
     (tmp_path/'outputs').mkdir()

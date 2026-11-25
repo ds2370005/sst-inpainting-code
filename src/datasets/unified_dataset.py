@@ -1,4 +1,6 @@
+# 役割: 衛星の時系列パッチと独立したデータ同化画像を読み込み、学習バッチを作る。
 """Unified lazy loader. Sample transforms extend features without changing readers."""
+# ── 使用するライブラリ・共通処理 ──────────────────
 from pathlib import Path
 import importlib
 import json
@@ -10,6 +12,7 @@ from torch.utils.data import Dataset,DataLoader
 from src.preprocessing.common import FORMAT_VERSION,read_array
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def observed_mean(fields, minimum):
     values=np.stack(fields)
     valid=np.isfinite(values)
@@ -32,6 +35,7 @@ class UnifiedSSTDataset(Dataset):
     def __init__(self,root,config,*,stage,transforms=()):
         if stage not in ('average','anomaly'):raise ValueError('Invalid stage')
         self.root=Path(root);self.stage=stage
+        # 前処理の完了状態と保存形式を確認してからデータを使う。
         status=json.loads((self.root/'run.json').read_text())
         if status.get('status')!='complete':raise ValueError('Preprocessing has not completed')
         manifest=json.loads((self.root/'dataset.json').read_text())
@@ -44,6 +48,7 @@ class UnifiedSSTDataset(Dataset):
                 raise ValueError(f'Training/preprocessing setting differs: {key}')
         self.samples=manifest['samples']
         self.selection_counts=dict(manifest['selection_counts'])
+        # 学習対象月でサンプルを絞る。入力履歴を構成する過去フレームは削除しない。
         months=config['data'].get('training_months')
         if months is not None:
             if not isinstance(months,list) or not months or any(
@@ -69,6 +74,7 @@ class UnifiedSSTDataset(Dataset):
         if stage == 'anomaly' and not self.natural_masks and len(self.cloud_donors) < 2:
             raise ValueError('Anomaly augmentation needs at least two distinct training images')
         self.physical_root = self.root
+        # 敵対的学習の実画像プールを選ぶ。現方式は毎時JCOPE、旧方式は日別GPVを使用する。
         mode = config['data'].get('assimilation_mode', 'legacy_gpv')
         if mode == 'hourly':
             location = config['data'].get('assimilation_root')
@@ -82,6 +88,7 @@ class UnifiedSSTDataset(Dataset):
                                   ('time_basis','UTC'), ('patch_size',self.settings['patch_size']),
                                   ('weekly_aggregation','168_consecutive_hourly_frames')]:
                 if physical.get(key) != expected: raise ValueError(f'Invalid physical pool: {key}')
+            # 衛星とシミュレーションの座標を比較し、同じ格子であることを確認する。
             for key in ('lat','lon'):
                 a=np.load(self.root/f'{key}.npy',allow_pickle=False)
                 b=np.load(self.physical_root/f'{key}.npy',allow_pickle=False)
@@ -107,11 +114,13 @@ class UnifiedSSTDataset(Dataset):
 
     def normalize(self,values):
         valid=np.isfinite(values)
+        # 水温を設定範囲から[-1,1]へ変換する。欠損位置は別の有効マスクで管理する。
         normalized=2*(values-self.settings['min_temp'])/(self.settings['max_temp']-self.settings['min_temp'])-1
         return torch.from_numpy(np.where(valid,normalized,0).astype(np.float32)),torch.from_numpy(valid.astype(np.float32))
 
     def __getitem__(self,index):
         row=self.samples[index];origin=row['origin']
+        # 同じパッチ位置を各時刻から切り出し、時系列順に積み重ねる。
         volume=np.stack([self.crop(path,'sst',origin) for path in row['frames']])[None]
         history=[self.crop(path,'sst',origin) for path in row['history']]
         weekly=observed_mean(history[:7],self.settings['weekly_min_observations'])

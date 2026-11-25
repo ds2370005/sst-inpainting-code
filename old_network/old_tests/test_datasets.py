@@ -1,5 +1,7 @@
+# 旧実装・旧テスト: 旧配列ローダーと平均・偏差データセットの読み込みが期待どおりに動くかを自動検査する。
 """Tests for dataset loading and field parsing helpers."""
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import json
 from pathlib import Path
 
@@ -10,6 +12,7 @@ import torch
 from old_network.old_src.datasets import AnomalyDataset, ArrayFieldLoader, AverageDataset
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def _config(patch_size: int = 8, time_steps: int = 3) -> dict:
     return {
         "data": {

@@ -1,13 +1,16 @@
+# 役割: SST時系列とマスクから基準SSTに対する偏差を生成するネットワークと共通層を定義する。
 """Generator architectures for SST average estimation and anomaly inpainting."""
 
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import torch
 from torch import nn
 
 from src.models.blocks import ConvELU, DilatedConvELU, ReflectionConv2d
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def _assert_4d_image_tensor(x: torch.Tensor, name: str) -> tuple[int, int, int, int]:  # ネットワーク定義: [B,C,H,W] の画像テンソルかを確認する
     assert x.ndim == 4, f"{name} must be [B, C, H, W], got {tuple(x.shape)}"
     batch, channels, height, width = x.shape
@@ -64,6 +67,7 @@ class EncoderDecoder2D(nn.Module):  # ネットワーク定義: 時系列特徴�
         assert in_channels > 0, f"in_channels must be positive, got {in_channels}"
         self.in_channels = in_channels
 
+        # エンコーダ：畳み込みと縮小で空間特徴を抽出し、拡張畳み込みで広い範囲を見る。
         self.e1 = ConvELU(in_channels, 32, kernel_size=5, stride=1)
         self.e2 = ConvELU(32, 64, kernel_size=3, stride=2)
         self.e3 = ConvELU(64, 64, kernel_size=3, stride=1)
@@ -75,6 +79,7 @@ class EncoderDecoder2D(nn.Module):  # ネットワーク定義: 時系列特徴�
         self.e9 = DilatedConvELU(256, 256, dilation=8)
         self.e10 = ReflectionConv2d(256, 256, kernel_size=3, dilation=16)
 
+        # デコーダ：特徴を段階的に拡大して、入力と同じ大きさの1枚の画像へ戻す。
         self.d1 = ConvELU(256, 128, kernel_size=3, stride=1)
         self.d1_second = ConvELU(128, 128, kernel_size=3)
         self.up1 = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=False)
@@ -132,6 +137,7 @@ class EncoderDecoder2D(nn.Module):  # ネットワーク定義: 時系列特徴�
         x = self.d8(x)
         assert x.shape == (batch, 1, height, width), tuple(x.shape)
 
+        # 出力を正規化範囲[-1,1]に制限する（tanhではなくクリッピング）。
         out = x.clamp(-1.0, 1.0)
         assert out.shape == (batch, 1, height, width), tuple(out.shape)
         return out
@@ -168,13 +174,17 @@ class AnomalyInpaintingGenerator(nn.Module):  # ネットワーク定義: 週平
         _assert_volume_tensor(mask_volume, "mask_volume", self.time_steps)
         _assert_single_time_volume(weekly_average, "weekly_average", batch, height, width)
 
+        # 1枚の基準SSTを時系列方向に複製し、各観測時刻との差分を取れる形にする。
         weekly_feature = weekly_average.repeat(1, 1, time_steps, 1, 1)
         assert weekly_feature.shape == (batch, 1, time_steps, height, width)
         # Normalize temperature DIFFERENCES by anomaly_range, not the SST span.
+        # 観測SST－基準SSTを偏差専用の尺度で正規化する。
         anomaly_volume = ((sst_volume - weekly_feature) / self.anomaly_scale).clamp(-1, 1)
+        # 欠損画素の偏差入力を0にし、有効・欠損の区別はマスクとして別に渡す。
         anomaly_volume = torch.where(mask_volume > 0, anomaly_volume, 0.0)
         assert anomaly_volume.shape == (batch, 1, time_steps, height, width)
 
+        # 偏差とマスクを結合し、1×1×1畳み込みで入力特徴へ変換する。
         x = torch.cat([anomaly_volume, mask_volume], dim=1)
         assert x.shape == (batch, 2, time_steps, height, width)
         x = self.projection(x)

@@ -1,5 +1,7 @@
+# 旧実装・旧テスト: 旧平均推定器の凍結と旧方式のアノマリー学習が期待どおりに動くかを自動検査する。
 """Tests for the anomaly-stage synthetic training loop."""
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 from src.utils.checkpoint import MODEL_FORMAT
 
 from pathlib import Path
@@ -17,6 +19,7 @@ from src.train.train_anomaly import (
 )
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def _synthetic_config(tmp_path: Path) -> dict:
     return {
         "seed": 42,

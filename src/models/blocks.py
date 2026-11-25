@@ -1,13 +1,16 @@
+# 役割: 生成器で共通使用する反射パディング・畳み込み・ELUなどの部品を定義する。
 """Reusable model blocks for the SST generators."""
 
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 from collections.abc import Sequence
 
 import torch
 from torch import nn
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def _pair(value: int | Sequence[int]) -> tuple[int, int]:  # ネットワーク部品: kernelやdilationを縦横2要素にそろえる
     if isinstance(value, int):
         return value, value

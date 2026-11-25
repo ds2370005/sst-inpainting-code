@@ -1,7 +1,9 @@
+# 旧実装・旧テスト: 旧データ索引とNPY・NPZ配列を読み込み、テンソルへ変換する。
 """Modular array loading helpers for dataset interfaces."""
 
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import csv
 import json
 from collections.abc import Mapping, Sequence
@@ -16,6 +18,7 @@ NETCDF_EXTENSIONS = {".nc", ".netcdf", ".cdf"}
 GEOTIFF_EXTENSIONS = {".tif", ".tiff"}
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def load_index_records(index_file: str | Path) -> list[dict[str, Any]]:  # データローダー: JSON/JSONL/CSVのindexをサンプル一覧として読む
     """Load sample records from JSON, JSONL, or CSV index files."""
     path = Path(index_file)

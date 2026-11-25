@@ -1,5 +1,7 @@
+# 旧実装・旧テスト: 旧平均推定の合成データによる学習処理が期待どおりに動くかを自動検査する。
 """Tests for the average-stage synthetic training loop."""
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 from pathlib import Path
 
 import torch
@@ -15,6 +17,7 @@ from old_network.old_src.train.train_average import (
 )
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def _synthetic_config(tmp_path: Path) -> dict:
     return {
         "seed": 42,

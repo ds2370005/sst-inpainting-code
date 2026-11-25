@@ -1,3 +1,4 @@
+# 役割: 海洋シミュレーションNetCDFの指定時刻・深さの水温を緯度経度上に描画する。
 """千葉県の海洋シミュレーションNetCDFを緯度・経度上に可視化する。
 
 リポジトリ直下からの実行例（pythonは必要なライブラリがある環境を使用）:
@@ -23,6 +24,7 @@ _FillValue等はnetCDF4のマスクを利用し、0は勝手に欠損扱いに�
 """
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 import math
 from pathlib import Path
@@ -46,6 +48,7 @@ VARIABLES = {
 }
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def read_fields(path: Path, variable: str, time_index: int, depth_index: int, all_times: bool):
     """必要な時刻・深さだけを読み、欠損マスクを保持して返す。"""
     with Dataset(path) as dataset:
@@ -162,5 +165,6 @@ def main():
         parser.exit(1, f'エラー: {exc}\n')
 
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__ == '__main__':
     main()

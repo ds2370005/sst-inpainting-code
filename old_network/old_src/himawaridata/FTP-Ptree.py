@@ -1,3 +1,5 @@
+# 旧実装・旧テスト: 旧方式でP-TreeのひまわりデータをFTP取得する。
+# ── 使用するライブラリ・共通処理 ──────────────────
 import os
 import time
 from datetime import datetime, timedelta
@@ -26,6 +28,7 @@ RETRY_COUNT = 3
 RETRY_DELAY_SECONDS = 10
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def _cleanup_partial_file(local_file_path: str) -> None:
     temp_file_path = f"{local_file_path}.part"
     if os.path.exists(temp_file_path):

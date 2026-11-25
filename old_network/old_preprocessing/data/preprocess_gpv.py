@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
+# 旧実装・旧テスト: GPVアーカイブから表層水温を抽出し、日別・週平均と学習用パッチを保存する。
 """Extract JMA Psbs FD01 1m daily forecasts and trailing seven-day means.
 
 Only numpy and eccodes are required. No network access. See README_GPV.md.
 """
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 from collections import deque
 from datetime import datetime, timedelta, timezone
@@ -23,6 +25,7 @@ ARCHIVE = re.compile(r"Z__C_RJTD_(\d{14})_OCN_GPV_Rjp_Gll2km_grib2.tar.gz$")
 SUFFIX = "_Lz1-1000_Psbs_FD01_grib2.bin"
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def atomic_npz(path, **fields):
     path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(dir=path.parent, suffix=".tmp", delete=False) as f:
@@ -279,6 +282,7 @@ def main(argv=None):
     return 1 if report["errors"] else 0
 
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     raise SystemExit(main())

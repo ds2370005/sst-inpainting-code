@@ -1,4 +1,6 @@
+# 旧実装・旧テスト: 旧観測パッチの保存・再実行・時間平均作成が期待どおりに動くかを自動検査する。
 """Single-observation storage tests using small real NetCDF fixtures."""
+# ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -9,6 +11,7 @@ from netCDF4 import Dataset
 from old_network.old_preprocessing.himawaridata.frame_preprocessing import create_observation_patches
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def write_nc(root, when, *, shift=0):
     root.mkdir(exist_ok=True)
     path = root / f"{when:%Y%m%d%H%M%S}-sample.nc"

@@ -1,6 +1,8 @@
+# 旧実装・旧テスト: 保存済み観測フレームを時刻で索引化し、時系列サンプルを組み立てる。
 """Index single-observation products without duplicating temporal arrays."""
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -12,6 +14,7 @@ import numpy as np
 NAME = re.compile(r"^(\d{14})_r(\d+)_c(\d+)\.npz$")
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def frame_key(path: Path) -> tuple[datetime, int, int]:
     match = NAME.fullmatch(path.name)
     if match is None:

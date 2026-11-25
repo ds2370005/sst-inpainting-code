@@ -1,7 +1,9 @@
+# 旧実装・旧テスト: 旧索引形式の配列からアノマリー学習用サンプルを読み込む。
 """Anomaly-inpainting dataset interfaces."""
 
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +28,7 @@ ANOMALY_FIELDS = (
 )
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 class AnomalyDataset(Dataset[dict[str, torch.Tensor]]):  # データローダー: indexファイルから異常補完用の学習サンプルを読む
     """Dataset backed by an index file of preprocessed tensor field paths."""
 

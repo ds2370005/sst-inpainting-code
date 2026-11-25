@@ -1,8 +1,11 @@
+# 旧実装・旧テスト: 月平均とSST時系列から欠損のない週平均を推定する旧生成器を定義する。
 """旧方式の学習型週平均推定器。"""
+# ── 使用するライブラリ・共通処理 ──────────────────
 import torch
 from torch import nn
 from src.models.generator import EncoderDecoder2D, _assert_volume_tensor, _assert_single_time_volume
 
+# ── 処理に使用する関数・クラス ──────────────────
 class AverageEstimationGenerator(nn.Module):  # ネットワーク定義: 月平均と時系列SSTから週平均SSTを推定する
     """Estimate a cloud-free weekly average SST image."""
 

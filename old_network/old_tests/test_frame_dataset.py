@@ -1,4 +1,6 @@
+# 旧実装・旧テスト: 旧フレーム形式の時系列順序・座標整合性・サンプル選別が期待どおりに動くかを自動検査する。
 """Temporal assembly, alignment and sample selection for frame-format datasets."""
+# ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime, timedelta
 
 import numpy as np
@@ -8,6 +10,7 @@ import torch
 from old_network.old_preprocessing.datasets.himawari_patch_dataset import HimawariPatchDataset, create_himawari_loader
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def products(root, *, steps=9, interval=6):
     frames = root / 'frames/himawari'
     averages = root / 'averages/himawari'

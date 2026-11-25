@@ -1,4 +1,6 @@
+# 旧実装・旧テスト: 旧平均推定器への月平均入力と追加人工雲の適用が期待どおりに動くかを自動検査する。
 """Paper architecture, unit conversion, augmentation and checkpoint contracts."""
+# ── 使用するライブラリ・共通処理 ──────────────────
 import pytest
 import torch
 from torch import nn
@@ -9,6 +11,7 @@ from src.train.train_anomaly import apply_random_cloud_mask
 from src.utils.checkpoint import MODEL_FORMAT, load_generator_state, require_model_format
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def test_monthly_feature_concatenated_without_temporal_repeat():
     model=AverageEstimationGenerator(time_steps=2)
     captured={}

@@ -1,6 +1,8 @@
+# 旧実装・旧テスト: 旧観測NPZの時系列を読み込み、SSTと雲マスクの表示に共通使用する。
 """Shared visualization of single-observation format_version=2 NPZ products."""
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 from datetime import timedelta
 from functools import lru_cache
@@ -16,6 +18,7 @@ from old_network.old_preprocessing.datasets.frame_index import frame_key, read_f
 from src.utils.config import load_config
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def load_sequence(root, *, target=None, satellite='himawari', time_steps=9,
                   interval_hours=6, patch_size=256):
     """Select exact times, oldest first, without applying training selection rules."""

@@ -1,7 +1,9 @@
+# 役割: 保存されたモデルの形式を検査し、互換性を確認して生成器の重みを読み込む。
 """Explicit boundary between the old simplified network and the paper revision."""
 MODEL_FORMAT = 'hirahara_tables_v2'
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def require_model_format(checkpoint):
     if checkpoint.get('model_format') != MODEL_FORMAT:
         raise ValueError('Incompatible legacy checkpoint: revised paper architecture requires retraining (hirahara_tables_v2).')

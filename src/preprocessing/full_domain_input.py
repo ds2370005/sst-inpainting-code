@@ -1,4 +1,6 @@
+# 役割: 保存済み全域データから指定時刻に対応する9時刻のSSTとマスクを読み込む。
 """保存済み全域フレームから9時刻の入力を読む。生データの再変換は不要。"""
+# ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import json
@@ -7,6 +9,7 @@ import torch
 from .common import read_array
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def load_full_frames(root, paths, settings, keep=None):
     volume = np.stack([np.asarray(read_array(root, p), dtype=np.float32) for p in paths])
     if len(paths) != 9:

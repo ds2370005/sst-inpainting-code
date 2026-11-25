@@ -1,4 +1,6 @@
+# テスト: 生成器と識別器の学習時の勾配伝播が期待どおりに動くかを自動検査する。
 """Adversarial-only backward must reach the first generator layer."""
+# ── 使用するライブラリ・共通処理 ──────────────────
 import copy
 
 import pytest
@@ -11,6 +13,7 @@ from src.utils.config import load_config
 from src.utils.normalization import anomaly_to_sst_scale
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 @pytest.mark.parametrize('stage', ['average', 'anomaly'])
 def test_adversarial_gradient_and_optimizer_updates(stage):
     torch.manual_seed(42)

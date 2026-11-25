@@ -1,4 +1,6 @@
+# テスト: 復元誤差・閾値評価とレポート作成が期待どおりに動くかを自動検査する。
 """Evaluate synthetic predictions without training or accessing server data."""
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 import importlib.util
 import json
@@ -13,6 +15,7 @@ evaluation = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(evaluation)
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def test_regression_metrics():
     result = evaluation.regression_metrics(np.array([1., 2., 3.]), np.array([2., 2., 2.]))
     assert result['mae_C'] == pytest.approx(2/3)

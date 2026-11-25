@@ -1,7 +1,10 @@
+# 旧実装・旧テスト: 全体識別器と局所PatchGANを組み合わせた旧識別器を定義する。
 """旧方式のglobal/local PatchGAN識別器。"""
+# ── 使用するライブラリ・共通処理 ──────────────────
 from torch import nn
 from src.models.discriminator import Discriminator
 
+# ── 処理に使用する関数・クラス ──────────────────
 class PhysicalModelDiscriminator(nn.Module):
     """ACPR global/local principle adapted to the TGRS 256px, single-SST output.
 

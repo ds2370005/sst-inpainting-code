@@ -1,9 +1,12 @@
+# テスト: 補間済みJCOPEの可視化出力が期待どおりに動くかを自動検査する。
+# ── 使用するライブラリ・共通処理 ──────────────────
 import json
 import numpy as np
 import pytest
 from visualize.visualize_jcope_alignment import visualize,edges
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def test_edges_preserve_descending_coordinates():
     np.testing.assert_allclose(edges([2.,1.,0.]),[2.5,1.5,.5,-.5])
     with pytest.raises(ValueError):edges([1.,1.])

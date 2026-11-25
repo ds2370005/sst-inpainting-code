@@ -1,9 +1,11 @@
+# 役割: 格子合わせ済みの毎時シミュレーションから、敵対的学習用の毎時・週平均プールを作る。
 """Build independent hourly/weekly physical-model pools from aligned Celsius NPY frames.
 
 Input simulation.json: units=degC, cadence_hours=1, time_basis=UTC,
 frames=[{time: ISO UTC, path: directory containing sst.npy}]. lat/lon.npy
 must already match the satellite grid. Native product decoding is separate.
 """
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 from collections import deque
 from datetime import datetime, timedelta, timezone
@@ -13,6 +15,7 @@ import numpy as np
 from src.preprocessing.common import read_array, save_frame, write_json, window_sum, choose_origins
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def parse_time(value):
     stamp = datetime.fromisoformat(value.replace('Z', '+00:00'))
     if stamp.tzinfo is not None:
@@ -101,4 +104,5 @@ def main():
     result=prepare(args.source,args.output,args.satellite_root,args.patch_size,args.patches_per_frame)
     print({key:len(value) for key,value in result['pools'].items()})
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__=='__main__': main()

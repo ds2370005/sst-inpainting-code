@@ -1,3 +1,4 @@
+# 旧実装・旧テスト: 旧ひまわり前処理が切り出す海域を図にして確認する。
 """Visualize the crop used by ``crop_nc_to_1650.py``.
 
 Example:
@@ -6,6 +7,7 @@ Example:
 
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 from pathlib import Path
 
@@ -25,6 +27,7 @@ from .crop_nc_to_1650 import (
 )
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def create_crop_figure(input_path: Path, output_path: Path) -> None:
     """Save a three-panel overview of the study area, grid, and one patch."""
     lat_slice, lon_slice, _, _ = study_area_slices(
@@ -120,5 +123,6 @@ def main() -> None:
     print(f"Saved: {args.output}")
 
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__ == "__main__":
     main()

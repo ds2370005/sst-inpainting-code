@@ -1,5 +1,7 @@
+# テスト: 平均・アノマリー生成器の入力制約と出力形状が期待どおりに動くかを自動検査する。
 """Tests for the generator forward passes."""
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import torch
 
 from src.models.generator import (
@@ -9,6 +11,7 @@ from src.models.generator import (
 )
 
 
+# ── 動作確認用のデータ・テスト ──────────────────
 def test_encoder_decoder_random_forward() -> None:
     batch = 2
     time_steps = 9

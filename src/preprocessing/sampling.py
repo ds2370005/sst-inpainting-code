@@ -1,10 +1,13 @@
+# 役割: 時系列の揃い方と観測条件を確認し、学習用のランダムパッチ位置を索引にする。
 """Seeded random spatial indices shared by temporal fields; independent GPV pool."""
+# ── 使用するライブラリ・共通処理 ──────────────────
 from datetime import datetime,timedelta
 from collections import Counter
 import numpy as np
 from .common import read_array, window_sum, choose_origins
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def build_indices(root, frames, gpv, settings):
     rng=np.random.default_rng(settings['seed'])
     size=settings['patch_size']; count=settings['patches_per_frame']

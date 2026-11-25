@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
+# 役割: JCOPEのNetCDFファイルを検査し、欠落や読み出しエラーを報告する。
 """JCOPEの日別ファイル・時間欠落・読み出しを検査する。陸域欠損は破損扱いしない。"""
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 from datetime import datetime,timedelta
 from pathlib import Path
@@ -8,6 +10,7 @@ import numpy as np
 from netCDF4 import Dataset,num2date
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def check(root,start,end,output,deep=False):
     root,output=Path(root),Path(output)
     start=datetime.fromisoformat(start);end=datetime.fromisoformat(end)
@@ -60,4 +63,5 @@ def main():
     p.add_argument('--deep',action='store_true',help='全時刻の全表層画素を順に読む（時間がかかる）')
     a=p.parse_args();r=check(a.root,a.start,a.end,a.output,a.deep)
     if r['issues']:raise SystemExit(1)
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__=='__main__':main()

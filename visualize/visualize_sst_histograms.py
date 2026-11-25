@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
+# 役割: 観測SST・基準SST・偏差・復元SSTの分布をヒストグラムと統計で比較する。
 """Compare saved reconstruction distributions; no training or downloads."""
 from __future__ import annotations
 
+# ── 使用するライブラリ・共通処理 ──────────────────
 import argparse
 import csv
 import json
@@ -14,6 +16,7 @@ import numpy as np
 import yaml
 
 
+# ── 処理に使用する関数・クラス ──────────────────
 def volume(array):
     array = np.asarray(array, dtype=np.float64)
     if array.ndim == 4:
@@ -201,5 +204,6 @@ def main():
         parser.exit(1,f'Error: {exc}\n')
 
 
+# ── このファイルを直接実行した場合の入口 ────────────
 if __name__=='__main__':
     main()
