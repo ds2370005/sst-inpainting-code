@@ -65,10 +65,25 @@ def visualize(run_dir, output=None, input_path=None, dpi=150, data_root=None):
         weekly = celsius(plane(archive["pred_weekly"], "pred_weekly"))
         anomaly = plane(archive["pred_anomaly"], "pred_anomaly") * anomaly_range
         reconstructed = celsius(plane(archive["pred_sst"], "pred_sst"))
+    nearest_baseline = config.get("baseline_method") == "temporal_mean_nearest"
+    if nearest_baseline:
+        if sst.shape[1] != 9:
+            raise ValueError("Nine-frame mean preview requires exactly nine frames")
+        # 各時刻の有効観測だけを平均。全時刻欠損はNaNのまま残す。
+        valid_history = (mask[0] > 0) & np.isfinite(sst[0])
+        count = valid_history.sum(axis=0)
+        total = np.where(valid_history, celsius(sst[0]), 0.0).sum(axis=0)
+        before_fill = np.full(count.shape, np.nan, dtype=np.float32)
+        np.divide(total, count, out=before_fill, where=count > 0)
+        reference_panel = ("9-frame mean (before nearest fill)", before_fill)
+        baseline_title = "Baseline SST (after nearest fill)"
+    else:
+        reference_panel = ("Observed monthly mean", monthly)
+        baseline_title = "Predicted weekly mean"
     panels = [
         ("Observed SST (latest frame)", observed),
-        ("Observed monthly mean", monthly),
-        ("Predicted weekly mean", weekly),
+        reference_panel,
+        (baseline_title, weekly),
         ("Predicted anomaly", anomaly),
         ("Reconstructed SST", reconstructed),
     ]
