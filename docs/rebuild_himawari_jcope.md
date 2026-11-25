@@ -14,7 +14,7 @@ python3 -m src.preprocessing.pipeline \
 ## JCOPEの完全性確認
 
 ```bash
-python3 check_jcope_download.py \
+python3 data_tools/check_jcope_download.py \
   --root /data2/itoh/JCOPE-T \
   --start 2024-08-01 --end 2025-12-31 \
   --output /workspace/sst-inpainting-code/outputs/jcope_check_001 \

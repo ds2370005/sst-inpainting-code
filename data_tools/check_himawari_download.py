@@ -8,7 +8,11 @@ import csv
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
-from download_himawari_sst import FILE_PATTERN
+# モジュール実行とファイル直接実行の両方に対応する。
+if __package__:
+    from .download_himawari_sst import FILE_PATTERN
+else:
+    from download_himawari_sst import FILE_PATTERN
 
 
 # ── 処理に使用する関数・クラス ──────────────────

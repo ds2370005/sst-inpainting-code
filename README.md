@@ -76,9 +76,10 @@
 ├── main.py                         # 前処理・学習・復元の実行管理
 ├── config*.yaml                    # 方式別の設定
 ├── requirements.txt
-├── download_himawari_sst.py         # ひまわりFTP取得
-├── check_himawari_download.py       # 取得状況・ファイル確認
-├── check_jcope_download.py          # JCOPEの読み出し確認
+├── data_tools/                     # 生データの取得・検査
+│   ├── download_himawari_sst.py     # ひまわりFTP取得
+│   ├── check_himawari_download.py   # 取得状況・ファイル確認
+│   └── check_jcope_download.py      # JCOPEの読み出し確認
 ├── src/
 │   ├── preprocessing/
 │   │   ├── Himawari_preprocessing.py # 全域SST・マスク保存

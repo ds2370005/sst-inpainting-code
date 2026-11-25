@@ -4,7 +4,7 @@
 
 認証情報：PTREE_FTP_USER / PTREE_FTP_PASSWORD、または--user / --password。
 保存先：PTREE_SST_OUTPUTまたは--output（既定値：./data）。
-実行例：python3 download_himawari_sst.py --output /srv/data/himawari
+実行例：python3 data_tools/download_himawari_sst.py --output /srv/data/himawari
 
 指定月の全日を対象とする有限の一括処理。再実行時は非空の正式ファイルをスキップし、
 中断した.tmpファイルは最初から取得する。保存先ごとに同時実行は1つに限定する。
